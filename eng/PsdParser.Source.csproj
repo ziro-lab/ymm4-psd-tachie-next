@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>PsdTachieNext.Parser</AssemblyName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <PsdParserSource>$(MSBuildThisFileDirectory)../.deps/PsdParser/PsdParser</PsdParserSource>
+    <PsdParserPatch>$(MSBuildThisFileDirectory)../.deps/patched-src/LayerAndMaskInformationSection.cs</PsdParserPatch>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PsdParserSource)/**/*.cs" Exclude="$(PsdParserSource)/obj/**;$(PsdParserSource)/bin/**;$(PsdParserSource)/LayerAndMaskInformationSection.cs" />
+    <Compile Include="$(PsdParserPatch)" />
+  </ItemGroup>
+  <Target Name="RequirePinnedSource" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(PsdParserSource)/PsdFile.cs') Or !Exists('$(PsdParserPatch)')" Text="Run: python eng/prepare_parser.py from plugins/psd-tachie-next first." />
+  </Target>
+</Project>

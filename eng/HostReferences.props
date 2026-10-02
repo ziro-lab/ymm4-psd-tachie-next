@@ -1,0 +1,10 @@
+<Project>
+  <!-- Consume the selected host's assemblies; never install an arbitrary second Vortice build. -->
+  <ItemGroup>
+    <HostReference Include="$(YMM4DirPath)/YukkuriMovieMaker.Plugin.dll;$(YMM4DirPath)/Vortice.*.dll;$(YMM4DirPath)/SharpGen.Runtime*.dll;$(YMM4DirPath)/Newtonsoft.Json.dll" />
+    <Reference Include="@(HostReference)"><Private>false</Private></Reference>
+  </ItemGroup>
+  <Target Name="RequireExactHostReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(YMM4DirPath)/YukkuriMovieMaker.Plugin.dll')" Text="Set YMM4DirPath to the isolated, version-verified YMM4 installation." />
+  </Target>
+</Project>

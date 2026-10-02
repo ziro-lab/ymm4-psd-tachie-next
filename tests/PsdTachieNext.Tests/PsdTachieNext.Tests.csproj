@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/PsdTachieNext.Compiler/PsdTachieNext.Compiler.csproj" /></ItemGroup>
+</Project>

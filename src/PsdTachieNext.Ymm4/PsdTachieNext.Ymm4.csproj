@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <Import Project="../../eng/HostReferences.props" />
+  <ItemGroup>
+    <Reference Include="$(YMM4DirPath)/YukkuriMovieMaker.dll"><Private>false</Private></Reference>
+    <ProjectReference Include="../PsdTachieNext.Core/PsdTachieNext.Core.csproj" />
+    <ProjectReference Include="../PsdTachieNext.Compiler/PsdTachieNext.Compiler.csproj" />
+    <!-- Same renderer source, bound to the host version rather than a second NuGet Vortice copy. -->
+    <Compile Include="../PsdTachieNext.Direct2D/TreeCompiledRenderer.cs" Link="Rendering/TreeCompiledRenderer.cs" />
+  </ItemGroup>
+</Project>
