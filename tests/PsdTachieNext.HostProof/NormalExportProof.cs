@@ -132,6 +132,7 @@ internal static class NormalExportProof
                 }
                 await Until(()=>Equals(Value(progress,"IsCompleted"),true),TimeSpan.FromSeconds(60));
                 lock(gate)Write(name+"-terminal-before-assertions.json",new{current.File,current.Requests,current.Frames,current.Errors,current.Disposals,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested,userCancelFlag=Value(progress,"IsCancellationRequested")});
+                var progressClosed=false;
                 if(name=="cold")
                 {
                     lock(gate){Check(current.Errors.Count==0&&current.Frames.Count>=5,"Cold job must render all requested frames without Source errors");}
@@ -156,6 +157,10 @@ internal static class NormalExportProof
                         Write(name+"-media.json",new{decodedBytes=partial.Length,decoderError=mediaError});
                         Check(partial.Length<64*32*4*5,"Failed job must not produce a complete five-frame video");
                     }
+                    // Native progress stays open at completion. Closing that completed
+                    // public view model allows the outer output command to present its error.
+                    Log(name+" close-completed-native-progress-before-error-observation");
+                    Execute(progress!,"CloseCommand");progressClosed=true;
                     // IsCompleted means terminal, not successful. Require native error presentation too.
                     await Until(()=>current.NativeErrorDialogs>0,TimeSpan.FromSeconds(10));
                     Check(current.NativeErrorDialogs>0,"Native writer must present its output error, not only a Source callback error");
@@ -164,7 +169,7 @@ internal static class NormalExportProof
                 object evidence;lock(gate)evidence=new{name,writer=plugin.GetType().FullName,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested,
                     current.ImmediateCancel,current.Cancellations,current.NativeErrorDialogs,compilerCount=service.CompilationCount,current.Requests,current.Frames,current.Errors,current.Disposals,
                     outputFile=Path.GetFileName(current.File),exists=File.Exists(current.File),bytes=File.Exists(current.File)?new FileInfo(current.File).Length:0};
-                cases.Add(evidence);Write(name+"-job.json",evidence);Execute(progress!,"CloseCommand");
+                cases.Add(evidence);Write(name+"-job.json",evidence);if(!progressClosed)Execute(progress!,"CloseCommand");
                 await Until(()=>Find(main!,"ProgressViewModel") is null);current.File=null;stage=null;
                 service.Dispose();
             }
