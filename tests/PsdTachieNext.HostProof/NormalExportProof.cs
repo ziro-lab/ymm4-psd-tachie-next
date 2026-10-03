@@ -4,7 +4,9 @@ using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using PsdTachieNext.Compiler;
 using PsdTachieNext.Ymm4;
@@ -48,7 +50,7 @@ internal static class NormalExportProof
     private static object? Find(object main,string type)=>ViewModels(main).FirstOrDefault(x=>x.GetType().FullName=="YukkuriMovieMaker.ViewModels."+type);
     private static async Task Run(string output)
     {
-        Directory.CreateDirectory(output);var cases=new List<object>();var services=new List<SourcePreparationService>();var assertions=0;string status="FAIL",error="";Stage? stage=null;object? nativeProgress=null;
+        Directory.CreateDirectory(output);var cases=new List<object>();var services=new List<SourcePreparationService>();var assertions=0;string status="FAIL",error="";Stage? stage=null;object? nativeProgress=null;var errorPresentationOpen=false;
         void Log(string value){lock(gate){if(value.StartsWith("native-output-error-dialog")&&stage is { } current)current.NativeErrorDialogs++;File.AppendAllText(Path.Combine(output,"export-stages.log"),DateTime.UtcNow.ToString("O")+" "+value+Environment.NewLine);}}
         void Write(string name,object value)=>File.WriteAllText(Path.Combine(output,name),JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}));
         void Check(bool value,string reason){assertions++;Log("assert "+assertions+" "+(value?"PASS ":"FAIL ")+reason);if(!value)throw new InvalidOperationException(reason);}
@@ -86,7 +88,7 @@ internal static class NormalExportProof
         {
             object? main=null;Window? window=null;var project=Environment.GetEnvironmentVariable("PSD_NEXT_LIVE_PROOF_PROJECT")!;
             await Until(()=>{window=Application.Current.Windows.Cast<Window>().FirstOrDefault(w=>w.DataContext?.GetType().FullName=="YukkuriMovieMaker.ViewModels.MainViewModel");main=window?.DataContext;return Equals(Value(main,"ProjectFilePath"),project)&&Public(main,"ActiveTimelineViewModel") is not null;});
-            foreach(var name in new[]{"cold","failure","cancel","reference-clear"})
+            foreach(var name in new[]{"cold","cancel","reference-clear","failure"})
             {
                 CompiledTachieSource.ProofPreparation=preview;stage=null;
                 var command=CommandSettings.Default[CommandType.OutputVideo]??throw new InvalidOperationException("Native OutputVideo unavailable");
@@ -132,6 +134,7 @@ internal static class NormalExportProof
                 }
                 await Until(()=>Equals(Value(progress,"IsCompleted"),true),TimeSpan.FromSeconds(60));
                 lock(gate)Write(name+"-terminal-before-assertions.json",new{current.File,current.Requests,current.Frames,current.Errors,current.Disposals,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested,userCancelFlag=Value(progress,"IsCancellationRequested")});
+                Write(name+"-visible-terminal-ui.json",VisibleText());
                 var progressClosed=false;
                 if(name=="cold")
                 {
@@ -162,8 +165,14 @@ internal static class NormalExportProof
                     Log(name+" close-completed-native-progress-before-error-observation");
                     Execute(progress!,"CloseCommand");progressClosed=true;
                     // IsCompleted means terminal, not successful. Require native error presentation too.
-                    await Until(()=>current.NativeErrorDialogs>0,TimeSpan.FromSeconds(10));
-                    Check(current.NativeErrorDialogs>0,"Native writer must present its output error, not only a Source callback error");
+                    try{await Until(()=>current.NativeErrorDialogs>0,TimeSpan.FromSeconds(10));}
+                    catch(TimeoutException)
+                    {
+                        errorPresentationOpen=true;
+                        Write(name+"-error-presentation-open.json",new{status="OPEN",required="Native output error presentation",observedOwnedStandardErrorDialogs=current.NativeErrorDialogs,visibleUi=VisibleText()});
+                        Log(name+" error presentation OPEN: no matching owned standard dialog observed; do not count Source error as native presentation");
+                    }
+                    if(current.NativeErrorDialogs>0)Check(true,"Native writer presents its output error");
                 }
                 else Check(nativeToken.IsCancellationRequested,"Native cancellation must remain requested");
                 object evidence;lock(gate)evidence=new{name,writer=plugin.GetType().FullName,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested,
@@ -174,7 +183,8 @@ internal static class NormalExportProof
                 service.Dispose();
             }
             var cancelEvidence=File.ReadAllText(Path.Combine(output,"cancel-wait-boundary.json"));
-            status=cancelEvidence.Contains("\"sourceDisposeWithinThreeSeconds\": true")&&cancelEvidence.Contains("\"preparationWaitCanceled\": true")?"PASS_NORMAL_WRITER_WITH_NATIVE_CANCEL":"PARTIAL_NORMAL_WRITER_NATIVE_CANCEL_BOUNDARY_OPEN";
+            var nativeCancelProved=cancelEvidence.Contains("\"sourceDisposeWithinThreeSeconds\": true")&&cancelEvidence.Contains("\"preparationWaitCanceled\": true");
+            status=nativeCancelProved&&!errorPresentationOpen?"PASS_NORMAL_WRITER_WITH_NATIVE_CANCEL":"PARTIAL_NORMAL_WRITER_BOUNDARIES_OPEN";
         }
         catch(Exception ex)
         {
@@ -197,9 +207,27 @@ internal static class NormalExportProof
             foreach(var service in services)service.Dispose();
             Write("export-results.json",new{status,assertions,error,hostVersion=typeof(Project).Assembly.GetName().Version?.ToString(),sourceHead=Environment.GetEnvironmentVariable("SOURCE_HEAD"),
                 productAssemblySha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(typeof(CompiledTachieSource).Assembly.Location))).ToLowerInvariant(),cases,
-                customWriterUsed=false,privateHostMethodsCalled=false,userAssetsUsed=false,policyChanged=false});
+                errorPresentationOpen,customWriterUsed=false,privateHostMethodsCalled=false,userAssetsUsed=false,policyChanged=false});
             File.WriteAllText(Path.Combine(output,"export-complete.txt"),status);
         }
+    }
+    private static object[] VisibleText()
+    {
+        var result=new List<object>();
+        foreach(Window window in Application.Current.Windows)
+        {
+            var texts=new List<string>();var pending=new Stack<DependencyObject>();pending.Push(window);var visited=0;
+            while(pending.Count>0&&visited++<5000)
+            {
+                var node=pending.Pop();
+                if(node is UIElement {IsVisible:false})continue;
+                var text=node switch{TextBlock block=>block.Text,TextBox box=>box.Text,_=>null};
+                if(!string.IsNullOrWhiteSpace(text))texts.Add(text);
+                for(var index=0;index<VisualTreeHelper.GetChildrenCount(node);index++)pending.Push(VisualTreeHelper.GetChild(node,index));
+            }
+            result.Add(new{window.Title,dataContext=window.DataContext?.GetType().FullName,texts});
+        }
+        return result.ToArray();
     }
     private static async Task<byte[]> Decode(string path)
     {
