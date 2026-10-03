@@ -36,6 +36,8 @@ H-A2 remains the active gate. `ITachieSource2` supplies Exporting usage but no j
 
 Two previous native attempts do not close this gate. The first observed cold wait/UI heartbeat, then failed its expected returned-frame assertion with incomplete failure diagnostics. The second selected the normal writer but timed out in Save automation before any Source requests. Neither proves successful output, native Cancel propagation or a completed file. Fix observability/automation before diagnosing semantics.
 
+The [2026-10-03 local matrix](NORMAL_EXPORT_EVIDENCE.md) now observes cold five-frame output, visible preparation failure and reference-clear abort through the official normal writer. It diagnoses the old filename automation/range assumptions and retains the failed records. **H-A2 stays OPEN:** native Cancel sets the real progress token/flag but does not dispose or cancel the gated Source within 3 seconds; termination after the separately logged test release is not cancellation proof. Resolve that correctly correlated public job-lifetime boundary next, then broaden the remaining matrix.
+
 Then complete A's normal plugin/parser loading, material listing/relink, native Undo during completion, actual player device changes and Windows publication/pin/cleanup/watcher cases. Keep synthetic results distinct from OS/host obligations.
 
 ## Extend decision checkpoint

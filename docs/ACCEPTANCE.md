@@ -13,6 +13,7 @@ Status date: 2026-10-03. Public baseline: `73cc24e7eb70a319f15f8191aa31081638ccc
 | Historical local selected-source prefetch | 166 assertions, 128 switches; CPU preparation promoted on placement; no GPU before placement; expiry about 30.45 seconds | Selected default-item path, priority, 16 MiB/30-second retention; 8/16 MiB accepted, over-limit rejected | Typical PSD/process peaks, physical GPU speed, whole-process limit or proposed 32 MiB setting |
 | Historical normal-writer attempt 1 | FAIL after eight assertions | Cold gated preparation/no ready frames/UI heartbeat before release | Returned-frame assertion failed; failure record incomplete; terminal state/output/exact cause unknown |
 | Historical normal-writer attempt 2 | Save automation timeout after writer selection; zero Source requests | Normal writer selected and path automation attempted | No Source/output/cancellation boundary evidence; disabled-element timeout is not a writer-contract failure |
+| [Local normal writer matrix, 2026-10-03](NORMAL_EXPORT_EVIDENCE.md), source `5272254` | Four cases complete; 50 control assertions; **PARTIAL** | Cold five-frame decode/one compile; preparation failure and reference-clear reach visible native error and stop output | Native Cancel did not interrupt the cold wait in 3 seconds; later termination needs test gate release. H-A2 remains OPEN; no public native artifact |
 
 Historical local observations are labeled as such; do not invent public artifact URLs for unpublished evidence. Reusable host facts should enter Lab with version/conditions/limits before broader adoption.
 
@@ -47,8 +48,8 @@ Historical local observations are labeled as such; do not invent public artifact
 | A23 | Candidate GPU failure | Atomic guards/WARP; physical device failure/recovery OPEN |
 | A24 | Odd/even dimensions, source replacement | Flat/tree pixels/placement fixtures; broader profile/final-host comparisons remain |
 | A25 | Async ready while paused | H-A1 bounded native + Lab PR 155; dirty/focus/audio/autosave NOT PROVEN |
-| A26 | Cold normal video output | **H-A2 OPEN**; strict Source wait implemented, complete/error/Cancel not proved |
-| A27 | Original changes during output | Export episode/reference guards at model/source layer; actual writer abort/snapshot OPEN |
+| A26 | Cold normal video output | **H-A2 OPEN**; local five-frame cold success and visible preparation failure observed; native Cancel wait interruption OPEN |
+| A27 | Original changes during output | Local reference-clear triggers guard/native error after one frame; actual file edit/relink/settings/snapshot matrix OPEN |
 | A28 | Normal plugin load with host parser present | Unique `PsdTachieNext.Parser`, exact-host build/historical load; clean release-package matrix future |
 | A29 | Original reference save/reopen/move/relink/material listing | Minimal source/`IFileItem`, bounded native reopen; full material/relink/later settings matrix OPEN |
 | A30 | Device epoch changes before late candidate | Synthetic stale-stamp rejection; actual player replacement/CPU reuse OPEN |
@@ -70,7 +71,7 @@ Fixture names describe scoped assertions, not completion of every corresponding 
 | Gate | Status | Next evidence |
 | --- | --- | --- |
 | H-A1: async paused repaint | Bounded observation, broader limitations OPEN | Source/frame/saved semantics, dirty/Undo/focus/autosave/disposed-owner cases where claimed |
-| H-A2: exact output wait/error/Cancel | **OPEN** | Stable normal Save/writer, cold all-frame oracle, failure propagated, native Cancel during wait, reference change, terminal/error/disposal record |
+| H-A2: exact output wait/error/Cancel | **OPEN**; scoped cold/error/reference-clear observed | Native Cancel requests cancellation but no disposal/wait cancellation in the measured 3 seconds; correlate job lifetime and prove interruption without cleanup release |
 | H-A3: player context/device/lifecycle | Partial native observations/synthetic stamps | Actual player replacement, Clear/Dispose and playback/output lifetime; WARP callback insufficient |
 | H-A4: source persistence/material API | Minimal connection/bounded reopen | Actual resource listing/move/relink, missing/ambiguous handling; no cache path as authority |
 

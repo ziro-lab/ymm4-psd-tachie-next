@@ -31,4 +31,6 @@ A future Lab Draft PR should state the narrow question, exact latest-stable vers
 
 ## Open interpretation boundaries
 
+The [local downstream normal-writer matrix](NORMAL_EXPORT_EVIDENCE.md), source `5272254f3c46c3c06661fa3319dafd737bb2aa07`, records cold success, visible native preparation/reference-clear failures and a negative Cancel-wait observation on official 4.56.1.0. It is a feedback candidate, not public Lab evidence or a completed H-A2 contract. Reusable candidates include accepted Save filename versus UIA readback, the measured exclusive range endpoint, terminal token ambiguity, WPF feedback presentation, and correct job-to-Source cancellation correlation. Preserve conditions and negative results in any subsequent narrow Lab experiment.
+
 Static notation findings do not establish required `*`/`!`/flip/hierarchy semantics. Public callbacks do not yet prove sufficient ended-contribution input for deterministic Extend. EX1 remains unadopted. A progress cancellation member is not an exporting Source token bridge. A paused repaint observation is not an audio/dirty/focus guarantee. Keep these boundaries open until a narrow native experiment or a deliberate product semantics decision resolves them.
