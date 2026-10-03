@@ -82,8 +82,26 @@ internal static class NormalExportProof
         };
         using var dialogsStop=new CancellationTokenSource();
         var automation=OwnedExportDialogs.Run(()=>{lock(gate)return(stage?.File,stage?.Errors.Count>0);},Log,dialogsStop.Token);
+        var observedFeedback=new HashSet<Window>();
         var confirmations=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};
-        confirmations.Tick+=(_,_)=>{foreach(Window window in Application.Current.Windows)if(window.Title=="確認")LiveRefreshProof.AcceptSyntheticProjectSettings(window,Log);};confirmations.Start();
+        confirmations.Tick+=(_,_)=>
+        {
+            foreach(Window window in Application.Current.Windows.Cast<Window>().ToArray())
+            {
+                if(window.Title=="確認")LiveRefreshProof.AcceptSyntheticProjectSettings(window,Log);
+                var current=Volatile.Read(ref stage);
+                if(current is null||window.DataContext?.GetType().FullName!="YukkuriMovieMaker.ViewModels.FeedbackViewModel"
+                    ||window.Title!="例外が発生しました"||observedFeedback.Contains(window))continue;
+                lock(gate)if(current.Errors.Count==0)continue;
+                var texts=ReadVisibleTexts(window);
+                if(!texts.Any(text=>text.Contains("動画ファイルの出力に失敗しました。")&&text.Contains("PR-A H-A2 synthetic")))continue;
+                observedFeedback.Add(window);
+                Write(current.Name+"-native-feedback.json",new{window.Title,dataContext=window.DataContext.GetType().FullName,texts,feedbackSent=false,clipboardUsed=false});
+                Log("native-output-error-dialog public-wpf-feedback "+current.Name);
+                // Close only the owned synthetic output error; never invoke Send or Copy.
+                window.Close();
+            }
+        };confirmations.Start();
         try
         {
             object? main=null;Window? window=null;var project=Environment.GetEnvironmentVariable("PSD_NEXT_LIVE_PROOF_PROJECT")!;
@@ -123,10 +141,13 @@ internal static class NormalExportProof
                 {
                     var cancelAt=current.Clock.Elapsed.TotalSeconds;Execute(progress!,"CancelCommand");await Until(()=>nativeToken.IsCancellationRequested);
                     await Task.Delay(3000);lock(gate)current.ImmediateCancel=current.Disposals.Count>0;
-                    Write("cancel-wait-boundary.json",new{nativeCancellationRequested=nativeToken.IsCancellationRequested,cancelAt,sourceDisposeWithinThreeSeconds=current.ImmediateCancel,preparationWaitCanceled=current.Cancellations>0,manualSourceDispose=false});
+                    Write("cancel-wait-boundary.json",new{nativeCancellationRequested=nativeToken.IsCancellationRequested,userCancelFlag=Value(progress,"IsCancellationRequested"),cancelAt,
+                        observationMilliseconds=3000,sourceDisposeWithinThreeSeconds=current.ImmediateCancel,preparationWaitCanceled=current.Cancellations>0,
+                        nativeCompletedBeforeTestRelease=Value(progress,"IsCompleted"),sourceFramesBeforeTestRelease=current.Frames.Count,compilerCountBeforeTestRelease=service.CompilationCount,manualSourceDispose=false});
                     // A bounded test release is explicitly not evidence that native Cancel interrupted Update.
                     if(!current.ImmediateCancel)Log("cancel boundary OPEN: releasing test gate after 3s; no native Dispose while waiting");
                 }
+                Log(name+" test-gate-release at="+current.Clock.Elapsed.TotalSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 current.Release.TrySetResult();
                 if(name=="reference-clear")
                 {
@@ -174,7 +195,17 @@ internal static class NormalExportProof
                     }
                     if(current.NativeErrorDialogs>0)Check(true,"Native writer presents its output error");
                 }
-                else Check(nativeToken.IsCancellationRequested,"Native cancellation must remain requested");
+                else
+                {
+                    Check(nativeToken.IsCancellationRequested,"Native cancellation must remain requested");
+                    if(File.Exists(current.File)&&new FileInfo(current.File).Length>0)
+                    {
+                        byte[] partial=[];string mediaError="";
+                        try{partial=await Decode(current.File!);}catch(InvalidDataException ex){mediaError=ex.Message;}
+                        Write("cancel-media-after-test-release.json",new{decodedBytes=partial.Length,decoderError=mediaError,waitInterruptedByNativeCancel=current.ImmediateCancel});
+                        Check(partial.Length<64*32*4*5,"Canceled job must not produce a complete five-frame video");
+                    }
+                }
                 object evidence;lock(gate)evidence=new{name,writer=plugin.GetType().FullName,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested,
                     current.ImmediateCancel,current.Cancellations,current.NativeErrorDialogs,compilerCount=service.CompilationCount,current.Requests,current.Frames,current.Errors,current.Disposals,
                     outputFile=Path.GetFileName(current.File),exists=File.Exists(current.File),bytes=File.Exists(current.File)?new FileInfo(current.File).Length:0};
@@ -216,18 +247,23 @@ internal static class NormalExportProof
         var result=new List<object>();
         foreach(Window window in Application.Current.Windows)
         {
-            var texts=new List<string>();var pending=new Stack<DependencyObject>();pending.Push(window);var visited=0;
-            while(pending.Count>0&&visited++<5000)
-            {
-                var node=pending.Pop();
-                if(node is UIElement {IsVisible:false})continue;
-                var text=node switch{TextBlock block=>block.Text,TextBox box=>box.Text,_=>null};
-                if(!string.IsNullOrWhiteSpace(text))texts.Add(text);
-                for(var index=0;index<VisualTreeHelper.GetChildrenCount(node);index++)pending.Push(VisualTreeHelper.GetChild(node,index));
-            }
+            var texts=ReadVisibleTexts(window);
             result.Add(new{window.Title,dataContext=window.DataContext?.GetType().FullName,texts});
         }
         return result.ToArray();
+    }
+    private static string[] ReadVisibleTexts(DependencyObject root)
+    {
+        var texts=new List<string>();var pending=new Stack<DependencyObject>();pending.Push(root);var visited=0;
+        while(pending.Count>0&&visited++<5000)
+        {
+            var node=pending.Pop();
+            if(node is UIElement {IsVisible:false})continue;
+            var text=node switch{TextBlock block=>block.Text,TextBox box=>box.Text,_=>null};
+            if(!string.IsNullOrWhiteSpace(text))texts.Add(text);
+            for(var index=0;index<VisualTreeHelper.GetChildrenCount(node);index++)pending.Push(VisualTreeHelper.GetChild(node,index));
+        }
+        return texts.ToArray();
     }
     private static async Task<byte[]> Decode(string path)
     {
