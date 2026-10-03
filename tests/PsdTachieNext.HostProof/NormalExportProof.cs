@@ -172,7 +172,13 @@ internal static class NormalExportProof
             var cancelEvidence=File.ReadAllText(Path.Combine(output,"cancel-wait-boundary.json"));
             status=cancelEvidence.Contains("\"sourceDisposeWithinThreeSeconds\": true")&&cancelEvidence.Contains("\"preparationWaitCanceled\": true")?"PASS_NORMAL_WRITER_WITH_NATIVE_CANCEL":"PARTIAL_NORMAL_WRITER_NATIVE_CANCEL_BOUNDARY_OPEN";
         }
-        catch(Exception ex){error=ex.ToString();Log("failure "+error);}
+        catch(Exception ex)
+        {
+            error=ex.ToString();
+            if(assertions==0)status="BLOCKED_BEFORE_NATIVE_OUTPUT";
+            else if(stage is { } blocked){lock(gate)if(blocked.Requests.Count==0)status="BLOCKED_BEFORE_EXPORT_SOURCE";}
+            Log(status+" "+error);
+        }
         finally
         {
             stage?.Release.TrySetResult();stage?.ContinueFrame.TrySetResult();confirmations.Stop();dialogsStop.Cancel();
