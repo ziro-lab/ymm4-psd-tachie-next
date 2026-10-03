@@ -39,6 +39,18 @@ The comparison uses public/currently relevant documentation rather than copying 
 
 ## Environment and publication
 
+The default development split uses confirmed environments and repeatable validation routes:
+
+| Environment | Primary work | Evidence boundary |
+| --- | --- | --- |
+| Cloud | Source/docs editing, ordinary pure core/runtime tests and CLI builds with the pinned SDK/parser/NuGet setup | Linux success cannot validate NTFS-sharing-dependent preparation tests. Windows renderer cross-build is compilation only, not D3D11/WARP execution or native host proof |
+| Actions | Windows builds and automated synthetic regressions, including Windows file-sharing cases and D3D11/WARP, through reviewed workflows | Current product CI builds against the verified official host but does not execute it. New native host-contract observations use a separately scoped Lab probe; workflow success retains its exact assertion boundary |
+| Notebook | Isolated-host interaction, authorized local real-material appearance, audio/visual acceptance and physical-device observations | Preserve original materials/settings; inputs are copies. User materials and derived pixels/projects/cache/screenshots remain local; local observations do not automatically become public reproducible evidence |
+
+Cloud setup, a cross-build and creation of a new task are separate events; do not infer an active task or Windows/native PASS from successful dependency setup. Keep Windows-specific tests assigned to Windows rather than weaken them to obtain a green Linux run.
+
+Use already confirmed environments/routes repeatedly to reduce interruption. Before a checkpoint, prepare the reviewable source, output paths and host identity, then group foreseeable required dependency/download/build/launch approvals within the approved scope. Ordinary reuse of an authorized validation host needs no extra discretionary confirmation, but platform-enforced approval and genuinely new installs, settings/security/authentication changes or publication scope still apply. This division reduces repeated setup; it is not a claim that approval is unnecessary or permission boundaries may be bypassed.
+
 Confirm official latest **stable** at the time of each new test. Record exact version/hash and repin/revalidate source/build/probes when it changes. An older stable used by another plugin is historical evidence, not this project's policy. The current CI pin checks the official latest release and fails for review if it changes.
 
 Use independent validation hosts and input copies. Preserve normal host settings/plugins/projects and original source materials. Stop for genuinely new installation/security/authentication requirements outside the approved task; repeated use of an already authorized validation host should not generate extra discretionary permission requests.

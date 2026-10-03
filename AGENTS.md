@@ -41,4 +41,6 @@ Use the official latest **stable version confirmed at test time**, record exact 
 
 Documentation-only edits receive document/link/publication checks, not a native host run. Source/test/workflow changes use the required Windows CI layer; do not claim the current build/WARP lane executes the actual YMM4 timeline or normal writer. Keep development feedback, checkpoint acceptance, real-host evidence and human acceptance separate. Current H-A2 is OPEN.
 
+Default to Cloud for editing/ordinary pure checks, Actions for Windows build/automated validation and the notebook for authorized local material/interaction. Linux cross-build cannot prove WARP, NTFS-sharing cases or host execution. Reuse confirmed routes and group foreseeable necessary approvals; preserve platform approval boundaries and new-operation authorization.
+
 Publish only reviewed source, general technical docs and synthetic test evidence. Exclude private links/paths, credentials, user PSD/PSB and derived cache/manifest/pixels/project/screenshot/log data, host binaries and old-plugin/decompiled code. Check licenses before adopting external code. The allowlist in `.gitignore` is deliberate; add individual documentation files rather than permitting all local notes.
