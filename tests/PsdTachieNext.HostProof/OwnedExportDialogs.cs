@@ -71,8 +71,8 @@ internal static class OwnedExportDialogs
                                 parent=TreeWalker.ControlViewWalker.GetParent(x)?.Current.AutomationId,
                                 value=x.TryGetCurrentPattern(ValuePattern.Pattern,out var value)?((ValuePattern)value).Current.Value:null}).ToArray();
                         log("native-save-edit-inventory "+System.Text.Json.JsonSerializer.Serialize(edits));
-                        // AutomationId 1001 also occurs in the address controls. Resolve the
-                        // filename host first instead of selecting the first edit in the dialog.
+                        // Resolve the filename host rather than relying on an edit ID being
+                        // globally unique across a common dialog's provider tree.
                         var filenameHost=root.FindFirst(TreeScope.Descendants,
                             new PropertyCondition(AutomationElement.AutomationIdProperty,"FileNameControlHost"));
                         if(filenameHost is null)throw new InvalidOperationException("Owned Save filename host was not found; do not submit an ambiguous dialog.");
@@ -82,10 +82,15 @@ internal static class OwnedExportDialogs
                         var edit=matches[0];
                         if(edit?.Current.IsEnabled==true&&edit.TryGetCurrentPattern(ValuePattern.Pattern,out var pattern)==true)
                         {
+                            edit.SetFocus();
+                            log("native-save-filename-focused "+edit.Current.HasKeyboardFocus);
+                            if(!edit.Current.HasKeyboardFocus)throw new InvalidOperationException("Owned Save filename editor did not receive focus; do not submit.");
                             ((ValuePattern)pattern).SetValue(current.Path);
                             var actual=((ValuePattern)pattern).Current.Value;
                             log("native-save-value "+actual);
                             if(!string.Equals(actual,current.Path,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Owned Save filename did not accept the requested path.");
+                            save.SetFocus();
+                            log("native-save-button-focused "+save.Current.HasKeyboardFocus);
                             // A provider may keep the dialog handle alive but disabled after submission.
                             // Never rewrite its value or submit again while the normal job starts.
                             submitted.Add((handle,current.Path));
