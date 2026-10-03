@@ -33,6 +33,19 @@ internal static class OwnedExportDialogs
                     var signature=System.Text.Json.JsonSerializer.Serialize(new{handle=handle.ToInt64(),title=root.Current.Name,enabled=root.Current.IsEnabled,buttons,texts});
                     if(!observed.TryGetValue(handle,out var previous)||previous!=signature)
                     {observed[handle]=signature;log("native-dialog-state "+signature);}
+                    // A new isolated executable path can trigger association setup even when
+                    // another validation host is initialized. Decline only this exact prompt;
+                    // accepting it would change normal system file associations.
+                    if(root.Current.IsEnabled&&texts.Any(text=>text.Contains("YMM4用の拡張子")&&text.Contains("関連付け")))
+                    {
+                        var decline=root.FindFirst(TreeScope.Descendants,new AndCondition(
+                            new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
+                            new PropertyCondition(AutomationElement.AutomationIdProperty,"7")));
+                        if(decline?.Current.IsEnabled==true&&decline.Current.Name.Contains("いいえ")
+                            &&submitted.Add((handle,"association-decline")))
+                        {log("native-isolated-association-declined");((InvokePattern)decline.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
+                        return true;
+                    }
                     var save=root.FindFirst(TreeScope.Descendants,new AndCondition(
                         new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
                         new PropertyCondition(AutomationElement.AutomationIdProperty,"1")));
