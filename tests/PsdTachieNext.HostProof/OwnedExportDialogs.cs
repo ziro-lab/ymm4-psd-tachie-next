@@ -12,6 +12,24 @@ internal static class OwnedExportDialogs
     [DllImport("user32.dll")]private static extern bool EnumWindows(EnumProc callback,IntPtr parameter);
     [DllImport("user32.dll")]private static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]private static extern int GetClassName(IntPtr window,StringBuilder name,int length);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]private static extern int GetWindowText(IntPtr window,StringBuilder text,int length);
+    [DllImport("user32.dll",EntryPoint="SendMessageTimeoutW",CharSet=CharSet.Unicode,SetLastError=true)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window,uint message,UIntPtr wParam,IntPtr lParam,uint flags,uint timeout,out UIntPtr result);
+    [DllImport("user32.dll",EntryPoint="SendMessageTimeoutW",CharSet=CharSet.Unicode,SetLastError=true)]
+    private static extern IntPtr SendMessageTimeout(IntPtr window,uint message,UIntPtr wParam,string lParam,uint flags,uint timeout,out UIntPtr result);
+    private static string ReplaceOwnedFilename(AutomationElement edit,string path)
+    {
+        var handle=(IntPtr)edit.Current.NativeWindowHandle;
+        GetWindowThreadProcessId(handle,out var process);
+        var kind=new StringBuilder(100);GetClassName(handle,kind,100);
+        if(handle==IntPtr.Zero||process!=(uint)Environment.ProcessId||kind.ToString()!="Edit")
+            throw new InvalidOperationException("Filename native edit ownership/class was not established; no messages sent.");
+        // Documented edit selection/replacement messages; no global keyboard input or host internals.
+        if(SendMessageTimeout(handle,0x00B1,UIntPtr.Zero,(IntPtr)(-1),0x0002,2000,out _)==IntPtr.Zero
+            ||SendMessageTimeout(handle,0x00C2,(UIntPtr)1,path,0x0002,2000,out _)==IntPtr.Zero)
+            throw new InvalidOperationException("Owned filename edit message timed out or failed.");
+        var actual=new StringBuilder(path.Length+100);GetWindowText(handle,actual,actual.Capacity);return actual.ToString();
+    }
     internal static Task Run(Func<(string? Path,bool ExpectedError)> state,Action<string> log,CancellationToken token)=>Task.Run(async()=>
     {
         var submitted=new HashSet<(IntPtr Handle,string Path)>();
@@ -85,7 +103,9 @@ internal static class OwnedExportDialogs
                             edit.SetFocus();
                             log("native-save-filename-focused "+edit.Current.HasKeyboardFocus);
                             if(!edit.Current.HasKeyboardFocus)throw new InvalidOperationException("Owned Save filename editor did not receive focus; do not submit.");
-                            ((ValuePattern)pattern).SetValue(current.Path);
+                            var nativeValue=ReplaceOwnedFilename(edit,current.Path);
+                            log("native-save-edit-text "+nativeValue);
+                            if(!string.Equals(nativeValue,current.Path,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Native filename text differs; do not submit.");
                             var actual=((ValuePattern)pattern).Current.Value;
                             log("native-save-value "+actual);
                             if(!string.Equals(actual,current.Path,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Owned Save filename did not accept the requested path.");
