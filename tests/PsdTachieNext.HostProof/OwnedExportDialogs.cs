@@ -31,13 +31,15 @@ internal static class OwnedExportDialogs
                         .Cast<AutomationElement>().Select(x=>new{name=x.Current.Name,id=x.Current.AutomationId,enabled=x.Current.IsEnabled}).ToArray();
                     var texts=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
                         .Cast<AutomationElement>().Select(x=>x.Current.Name).ToArray();
+                    var body=System.Text.RegularExpressions.Regex.Replace(string.Join(" ",texts),@"\s+"," ").Trim();
                     var signature=System.Text.Json.JsonSerializer.Serialize(new{handle=handle.ToInt64(),title=root.Current.Name,enabled=root.Current.IsEnabled,buttons,texts});
                     if(!observed.TryGetValue(handle,out var previous)||previous!=signature)
                     {observed[handle]=signature;log("native-dialog-state "+signature);}
                     // A new isolated executable path can trigger association setup even when
                     // another validation host is initialized. Decline only this exact prompt;
                     // accepting it would change normal system file associations.
-                    if(root.Current.IsEnabled&&texts.Any(text=>text.Contains("YMM4用の拡張子")&&text.Contains("関連付け")))
+                    const string associationPrompt="YMM4用の拡張子がゆっくりMovieMaker4に関連付けられていません。 以下の拡張子を関連付けしますか？ - .ymmp: プロジェクトファイル - .ymmt: テンプレートファイル - .ymme: プラグインファイル 関連付けると、各ファイルをダブルクリックしてYMM4を起動できるようになります。";
+                    if(root.Current.IsEnabled&&root.Current.Name=="確認"&&body==associationPrompt)
                     {
                         var decline=root.FindFirst(TreeScope.Descendants,new AndCondition(
                             new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
@@ -47,7 +49,8 @@ internal static class OwnedExportDialogs
                         {associationDeclined=true;log("native-isolated-association-declined");((InvokePattern)decline.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
                         return true;
                     }
-                    if(associationDeclined&&root.Current.IsEnabled&&texts.Any(text=>text.Contains("今後、関連付けしたい場合")&&text.Contains("YMM4用拡張子の関連付け")))
+                    const string associationNotice="今後、関連付けしたい場合は ヘルプ(H) → YMM4用拡張子の関連付け → 登録する を実行してください。";
+                    if(associationDeclined&&root.Current.IsEnabled&&root.Current.Name=="通知"&&body==associationNotice)
                     {
                         var acknowledge=root.FindFirst(TreeScope.Descendants,new AndCondition(
                             new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
