@@ -16,6 +16,7 @@ internal static class OwnedExportDialogs
     {
         var submitted=new HashSet<(IntPtr Handle,string Path)>();
         var observed=new Dictionary<IntPtr,string>();
+        var associationDeclined=false;
         while(!token.IsCancellationRequested)
         {
             var current=state();
@@ -43,7 +44,17 @@ internal static class OwnedExportDialogs
                             new PropertyCondition(AutomationElement.AutomationIdProperty,"7")));
                         if(decline?.Current.IsEnabled==true&&decline.Current.Name.Contains("いいえ")
                             &&submitted.Add((handle,"association-decline")))
-                        {log("native-isolated-association-declined");((InvokePattern)decline.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
+                        {associationDeclined=true;log("native-isolated-association-declined");((InvokePattern)decline.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
+                        return true;
+                    }
+                    if(associationDeclined&&root.Current.IsEnabled&&texts.Any(text=>text.Contains("今後、関連付けしたい場合")&&text.Contains("YMM4用拡張子の関連付け")))
+                    {
+                        var acknowledge=root.FindFirst(TreeScope.Descendants,new AndCondition(
+                            new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
+                            new PropertyCondition(AutomationElement.AutomationIdProperty,"2")));
+                        if(acknowledge?.Current.IsEnabled==true&&acknowledge.Current.Name=="OK"
+                            &&submitted.Add((handle,"association-decline-notice")))
+                        {log("native-isolated-association-notice-acknowledged");((InvokePattern)acknowledge.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
                         return true;
                     }
                     var save=root.FindFirst(TreeScope.Descendants,new AndCondition(
