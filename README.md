@@ -8,6 +8,16 @@ YMM4で元PSD/PSBを非同期に準備し、編集時の表示と共有キャッ
 
 初期CIは合成素材だけでpure、準備/共有runtime、Windows WARP renderer回帰を実行します。公式YMM4 4.56.1.0 Liteをjob内だけで取得し、versionとSHA256を確認してアダプターをbuildします。アダプターbuildやWARP回帰は実YMM4の通常タイムライン・動画writer成功・物理GPU性能の証明ではありません。最新版の変更時には版とhashを見直します。
 
+開発を引き継ぐ場合は、次の文書を順に確認してください。機能要件、現在の実装、実測と未検証を分け、公開ラボのmainだけでなくPR・ブランチの知見も参照します。新しい実ホスト試験では、その時点の公式最新版安定版を確認します。
+
+- [作業方針](AGENTS.md)
+- [完成時の機能要件](docs/PRODUCT_REQUIREMENTS.md)：PSDTool記法、疎な表情・プリセット・Override・Extend、目口、パレット、保存・復旧を含む全体範囲
+- [現在の構成と設計判断](docs/ARCHITECTURE.md)
+- [A〜Iの実装計画](docs/DEVELOPMENT_PLAN.md)：直近のH-A2と、未採用のExtend EX1を区別
+- [受け入れ基準と現在の証拠](docs/ACCEPTANCE.md)：A01〜A30、CI・過去のローカル実測・未検証
+- [開発・検証・Draft PRの進め方](docs/DEVELOPMENT_WORKFLOW.md)
+- [公開ラボの知見と還元候補](docs/LAB_EVIDENCE.md)
+
 開発環境は.NET SDK 10.0.401です。固定MIT parserの準備後に、例えば次を実行します。
 
 ```powershell
