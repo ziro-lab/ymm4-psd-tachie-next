@@ -106,7 +106,9 @@ internal static class NormalExportProof
         {
             object? main=null;Window? window=null;var project=Environment.GetEnvironmentVariable("PSD_NEXT_LIVE_PROOF_PROJECT")!;
             await Until(()=>{window=Application.Current.Windows.Cast<Window>().FirstOrDefault(w=>w.DataContext?.GetType().FullName=="YukkuriMovieMaker.ViewModels.MainViewModel");main=window?.DataContext;return Equals(Value(main,"ProjectFilePath"),project)&&Public(main,"ActiveTimelineViewModel") is not null;});
-            foreach(var name in new[]{"cold","cancel","reference-clear","failure"})
+            // Clearing the logical fixture reference is destructive to this input copy;
+            // keep it last so later cases cannot accidentally export that cleared fixture.
+            foreach(var name in new[]{"cold","failure","cancel","reference-clear"})
             {
                 CompiledTachieSource.ProofPreparation=preview;stage=null;
                 var command=CommandSettings.Default[CommandType.OutputVideo]??throw new InvalidOperationException("Native OutputVideo unavailable");
