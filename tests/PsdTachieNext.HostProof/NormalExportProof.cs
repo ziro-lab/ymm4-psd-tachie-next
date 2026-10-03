@@ -50,17 +50,17 @@ internal static class NormalExportProof
     private static object? Find(object main,string type)=>ViewModels(main).FirstOrDefault(x=>x.GetType().FullName=="YukkuriMovieMaker.ViewModels."+type);
     private static async Task Run(string output)
     {
-        Directory.CreateDirectory(output);var cases=new List<object>();var assertions=0;string status="FAIL",error="";Stage? stage=null;
+        Directory.CreateDirectory(output);var cases=new List<object>();var assertions=0;string status="FAIL",error="";Stage? stage=null;object? nativeProgress=null;
         void Log(string value){lock(gate){if(value.StartsWith("native-output-error-dialog")&&stage is { } current)current.NativeErrorDialogs++;File.AppendAllText(Path.Combine(output,"export-stages.log"),DateTime.UtcNow.ToString("O")+" "+value+Environment.NewLine);}}
         void Write(string name,object value)=>File.WriteAllText(Path.Combine(output,name),JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}));
-        void Check(bool value,string reason){assertions++;if(!value)throw new InvalidOperationException(reason);}
+        void Check(bool value,string reason){assertions++;Log("assert "+assertions+" "+(value?"PASS ":"FAIL ")+reason);if(!value)throw new InvalidOperationException(reason);}
         using var preview=new SourcePreparationService(new CompiledAssetRepository(Path.Combine(output,"preview-cache")));
         CompiledTachieSource.ProofPreparation=preview;CompiledTachieSource.ProofPrefetch=null;
         CompiledTachieSource.ProofLifecycle=(source,eventName)=>
         {
             var current=Volatile.Read(ref stage);if(current is null||!source.UsesPreparation(current.Service))return;
             lock(gate){if(eventName=="export-start")current.Sources.Add(source);else if(eventName=="dispose-requested"&&current.Sources.Contains(source))current.Disposals.Add(current.Clock.Elapsed.TotalSeconds);}
-            Log(current.Name+" "+eventName);
+                Log(current.Name+" "+eventName);
         };
         CompiledTachieSource.ProofHostRequest=description=>
         {
@@ -83,7 +83,7 @@ internal static class NormalExportProof
         using var dialogsStop=new CancellationTokenSource();
         SaveFileDialogViewModel? saveModel=null;
         EventHandler<SaveFileDialogViewModel.SaveFileDialogEventArgs> saved=(_,args)=>
-        {var current=Volatile.Read(ref stage);if(current is not null){current.NativeOutputFile=args.FilePath;Log("native-save-result "+args.FilePath);}};
+        {var current=Volatile.Read(ref stage);if(current is not null){current.NativeOutputFile=args.FilePath;Log("native-save-result "+(args.FilePath??"<null>"));}};
         var automation=OwnedExportDialogs.Run(()=>{lock(gate)return(stage?.File,stage?.Errors.Count>0);},Log,dialogsStop.Token);
         var confirmations=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};
         confirmations.Tick+=(_,_)=>{foreach(Window window in Application.Current.Windows)if(window.Title=="確認")LiveRefreshProof.AcceptSyntheticProjectSettings(window,Log);};confirmations.Start();
@@ -99,6 +99,7 @@ internal static class NormalExportProof
                 await Until(()=>command.CanExecute(null,window!));command.Execute(null,window!);
                 object? config=null;await Until(()=>{config=Find(main!,"Mp4ConfigViewModel");return config is not null;});
                 Set(config!,"EncodeFrom",0);Set(config!,"EncodeTo",4);
+                Write(name+"-native-config.json",new{encodeFrom=Value(config,"EncodeFrom"),encodeTo=Value(config,"EncodeTo"),projectVideo=Public(Public(main,"ActiveTimelineViewModel"),"Timeline") is Timeline timeline?new{timeline.VideoInfo.Width,timeline.VideoInfo.Height,timeline.VideoInfo.FPS}:null});
                 var plugin=(IVideoFileWriterPlugin)Value(config,"SelectedVideoFileWriterPlugin")!;
                 Check(plugin.GetType().Assembly.GetName().Name!.StartsWith("YukkuriMovieMaker"),"Use only the official bundled writer.");
                 Check(!plugin.NeedDownloadResources(),"Writer requires resources/dependencies; stop.");
@@ -116,6 +117,7 @@ internal static class NormalExportProof
                 await current.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
                 Check(string.Equals(current.NativeOutputFile,current.File,StringComparison.OrdinalIgnoreCase),"Native Save result must equal the owned output path");
                 object? progress=null;await Until(()=>{progress=Find(main!,"ProgressViewModel");return progress is not null;});
+                nativeProgress=progress;
                 var nativeToken=(CancellationToken)Public(progress!,"CancellationToken")!;
                 lock(gate){Check(current.Sources.Count>0,"Cold service must belong to a real exporting Source");Check(current.Frames.Count==0,"No Source Update may return before readiness");}
                 Check(service.CompilationCount==0,"Preview must not warm the export cache");
@@ -175,7 +177,7 @@ internal static class NormalExportProof
         {
             stage?.Release.TrySetResult();stage?.ContinueFrame.TrySetResult();confirmations.Stop();dialogsStop.Cancel();
             if(saveModel is not null)saveModel.Requested-=saved;
-            if(stage is { } active)lock(gate)Write("active-stage-on-exit.json",new{active.Name,active.File,active.NativeOutputFile,active.Requests,active.Frames,active.Errors,active.Disposals,active.Cancellations,compilerCount=active.Service.CompilationCount});
+            if(stage is { } active)lock(gate)Write("active-stage-on-exit.json",new{active.Name,active.File,active.NativeOutputFile,active.Requests,active.Frames,active.Errors,active.Disposals,active.Cancellations,compilerCount=active.Service.CompilationCount,nativeCompleted=Value(nativeProgress,"IsCompleted"),nativeMessage=Public(nativeProgress,"Message")});
             try{await automation;}catch(OperationCanceledException){}catch(Exception ex){status="FAIL";error+="\nOwned dialog automation: "+ex;}
             CompiledTachieSource.ProofPreparation=null;CompiledTachieSource.ProofLifecycle=null;CompiledTachieSource.ProofHostRequest=null;CompiledTachieSource.ProofHostUpdate=null;CompiledTachieSource.ProofHostError=null;
             Write("export-results.json",new{status,assertions,error,hostVersion=typeof(Project).Assembly.GetName().Version?.ToString(),sourceHead=Environment.GetEnvironmentVariable("SOURCE_HEAD"),

@@ -14,6 +14,8 @@ internal static class OwnedExportDialogs
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]private static extern int GetClassName(IntPtr window,StringBuilder name,int length);
     internal static Task Run(Func<(string? Path,bool ExpectedError)> state,Action<string> log,CancellationToken token)=>Task.Run(async()=>
     {
+        var submitted=new HashSet<(IntPtr Handle,string Path)>();
+        var observed=new Dictionary<IntPtr,string>();
         while(!token.IsCancellationRequested)
         {
             var current=state();
@@ -24,25 +26,37 @@ internal static class OwnedExportDialogs
                 try
                 {
                     var root=AutomationElement.FromHandle(handle);
+                    var buttons=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button))
+                        .Cast<AutomationElement>().Select(x=>new{name=x.Current.Name,id=x.Current.AutomationId,enabled=x.Current.IsEnabled}).ToArray();
+                    var texts=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
+                        .Cast<AutomationElement>().Select(x=>x.Current.Name).ToArray();
+                    var signature=System.Text.Json.JsonSerializer.Serialize(new{handle=handle.ToInt64(),title=root.Current.Name,enabled=root.Current.IsEnabled,buttons,texts});
+                    if(!observed.TryGetValue(handle,out var previous)||previous!=signature)
+                    {observed[handle]=signature;log("native-dialog-state "+signature);}
                     var save=root.FindFirst(TreeScope.Descendants,new AndCondition(
                         new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
                         new PropertyCondition(AutomationElement.AutomationIdProperty,"1")));
-                    if(current.Path is not null&&save?.Current.Name.Contains("保存")==true)
+                    if(current.Path is not null&&save?.Current.Name.Contains("保存")==true
+                        &&root.Current.IsEnabled&&save.Current.IsEnabled&&!submitted.Contains((handle,current.Path)))
                     {
                         var edit=root.FindFirst(TreeScope.Descendants,new AndCondition(
                             new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit),
                             new PropertyCondition(AutomationElement.AutomationIdProperty,"1001")));
-                        if(edit?.TryGetCurrentPattern(ValuePattern.Pattern,out var pattern)==true)
+                        if(edit?.Current.IsEnabled==true&&edit.TryGetCurrentPattern(ValuePattern.Pattern,out var pattern)==true)
                         {
                             ((ValuePattern)pattern).SetValue(current.Path);
-                            log("native-save-value "+((ValuePattern)pattern).Current.Value);
+                            var actual=((ValuePattern)pattern).Current.Value;
+                            log("native-save-value "+actual);
+                            if(!string.Equals(actual,current.Path,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Owned Save filename did not accept the requested path.");
+                            // A provider may keep the dialog handle alive but disabled after submission.
+                            // Never rewrite its value or submit again while the normal job starts.
+                            submitted.Add((handle,current.Path));
                             log("native-save-dialog "+Path.GetFileName(current.Path));((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+                            log("native-save-submit-returned "+Path.GetFileName(current.Path));
                         }
                     }
                     else if(current.ExpectedError&&save?.Current.Name=="OK")
                     {
-                        var texts=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
-                            .Cast<AutomationElement>().Select(x=>x.Current.Name).ToArray();
                         if(texts.Any(text=>text.Contains("動画")&&text.Contains("出力")))
                         {log("native-output-error-dialog "+string.Join(" | ",texts));((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
                     }
