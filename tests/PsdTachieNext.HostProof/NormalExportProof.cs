@@ -13,7 +13,6 @@ using YukkuriMovieMaker.Player.Video;
 using YukkuriMovieMaker.Project;
 using YukkuriMovieMaker.Project.Items;
 using YukkuriMovieMaker.Settings;
-using YukkuriMovieMaker.ViewModels;
 
 namespace PsdTachieNext.HostProof;
 
@@ -31,7 +30,6 @@ internal static class NormalExportProof
         internal readonly Stopwatch Clock=Stopwatch.StartNew();
         internal CompiledItemParameter? NextParameter;
         internal string? File;
-        internal string? NativeOutputFile;
         internal int Cancellations;
         internal bool ImmediateCancel;
         internal int NativeErrorDialogs;
@@ -50,7 +48,7 @@ internal static class NormalExportProof
     private static object? Find(object main,string type)=>ViewModels(main).FirstOrDefault(x=>x.GetType().FullName=="YukkuriMovieMaker.ViewModels."+type);
     private static async Task Run(string output)
     {
-        Directory.CreateDirectory(output);var cases=new List<object>();var assertions=0;string status="FAIL",error="";Stage? stage=null;object? nativeProgress=null;
+        Directory.CreateDirectory(output);var cases=new List<object>();var services=new List<SourcePreparationService>();var assertions=0;string status="FAIL",error="";Stage? stage=null;object? nativeProgress=null;
         void Log(string value){lock(gate){if(value.StartsWith("native-output-error-dialog")&&stage is { } current)current.NativeErrorDialogs++;File.AppendAllText(Path.Combine(output,"export-stages.log"),DateTime.UtcNow.ToString("O")+" "+value+Environment.NewLine);}}
         void Write(string name,object value)=>File.WriteAllText(Path.Combine(output,name),JsonSerializer.Serialize(value,new JsonSerializerOptions{WriteIndented=true}));
         void Check(bool value,string reason){assertions++;Log("assert "+assertions+" "+(value?"PASS ":"FAIL ")+reason);if(!value)throw new InvalidOperationException(reason);}
@@ -81,9 +79,6 @@ internal static class NormalExportProof
             Log(current.Name+" source-error "+exception);
         };
         using var dialogsStop=new CancellationTokenSource();
-        SaveFileDialogViewModel? saveModel=null;
-        EventHandler<SaveFileDialogViewModel.SaveFileDialogEventArgs> saved=(_,args)=>
-        {var current=Volatile.Read(ref stage);if(current is not null){current.NativeOutputFile=args.FilePath;Log("native-save-result "+(args.FilePath??"<null>"));}};
         var automation=OwnedExportDialogs.Run(()=>{lock(gate)return(stage?.File,stage?.Errors.Count>0);},Log,dialogsStop.Token);
         var confirmations=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(250)};
         confirmations.Tick+=(_,_)=>{foreach(Window window in Application.Current.Windows)if(window.Title=="確認")LiveRefreshProof.AcceptSyntheticProjectSettings(window,Log);};confirmations.Start();
@@ -91,7 +86,6 @@ internal static class NormalExportProof
         {
             object? main=null;Window? window=null;var project=Environment.GetEnvironmentVariable("PSD_NEXT_LIVE_PROOF_PROJECT")!;
             await Until(()=>{window=Application.Current.Windows.Cast<Window>().FirstOrDefault(w=>w.DataContext?.GetType().FullName=="YukkuriMovieMaker.ViewModels.MainViewModel");main=window?.DataContext;return Equals(Value(main,"ProjectFilePath"),project)&&Public(main,"ActiveTimelineViewModel") is not null;});
-            saveModel=(SaveFileDialogViewModel)Public(main,"SaveFileDialogViewModel")!;saveModel.Requested+=saved;
             foreach(var name in new[]{"cold","failure","cancel","reference-clear"})
             {
                 CompiledTachieSource.ProofPreparation=preview;stage=null;
@@ -105,7 +99,7 @@ internal static class NormalExportProof
                 Check(!plugin.NeedDownloadResources(),"Writer requires resources/dependencies; stop.");
                 Check(plugin.OutputPathMode==VideoFileWriterOutputPath.File,"Default native writer must output a file.");
                 var extension=plugin.GetFileExtention().TrimStart('.');Check(extension.All(char.IsAsciiLetterOrDigit),"Unexpected native extension");
-                using var service=new SourcePreparationService(new CompiledAssetRepository(Path.Combine(output,name+"-cold-cache")));
+                var service=new SourcePreparationService(new CompiledAssetRepository(Path.Combine(output,name+"-cold-cache")));services.Add(service);
                 var current=new Stage(name,service){File=Path.Combine(output,name+"."+extension)};Volatile.Write(ref stage,current);
                 service.BeforeSnapshot=async token=>
                 {
@@ -115,7 +109,6 @@ internal static class NormalExportProof
                 };
                 CompiledTachieSource.ProofPreparation=service;Log(name+" native-output-command writer="+plugin.GetType().FullName);Execute(config!,"OutputCommand");
                 await current.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
-                Check(string.Equals(current.NativeOutputFile,current.File,StringComparison.OrdinalIgnoreCase),"Native Save result must equal the owned output path");
                 object? progress=null;await Until(()=>{progress=Find(main!,"ProgressViewModel");return progress is not null;});
                 nativeProgress=progress;
                 var nativeToken=(CancellationToken)Public(progress!,"CancellationToken")!;
@@ -136,10 +129,11 @@ internal static class NormalExportProof
                     await current.NextFrame.Task.WaitAsync(TimeSpan.FromSeconds(30));current.NextParameter!.Source=null;current.ContinueFrame.TrySetResult();
                 }
                 await Until(()=>Equals(Value(progress,"IsCompleted"),true),TimeSpan.FromSeconds(60));
-                lock(gate)Write(name+"-terminal-before-assertions.json",new{current.NativeOutputFile,current.Requests,current.Frames,current.Errors,current.Disposals,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested});
+                lock(gate)Write(name+"-terminal-before-assertions.json",new{current.File,current.Requests,current.Frames,current.Errors,current.Disposals,completed=Value(progress,"IsCompleted"),message=Public(progress,"Message"),nativeCancel=nativeToken.IsCancellationRequested});
                 if(name=="cold")
                 {
                     lock(gate){Check(current.Errors.Count==0&&current.Frames.Count>=5,"Cold job must render all requested frames without Source errors");}
+                    Check(File.Exists(current.File),"Native media must exist at the exact owned output path; UIA readback alone is insufficient");
                     var pixels=await Decode(current.File!);Check(pixels.Length==64*32*4*5,"Native media must decode to five complete frames");
                     for(var frame=0;frame<5;frame++)
                     {
@@ -168,6 +162,7 @@ internal static class NormalExportProof
                     outputFile=Path.GetFileName(current.File),exists=File.Exists(current.File),bytes=File.Exists(current.File)?new FileInfo(current.File).Length:0};
                 cases.Add(evidence);Write(name+"-job.json",evidence);Execute(progress!,"CloseCommand");
                 await Until(()=>Find(main!,"ProgressViewModel") is null);current.File=null;stage=null;
+                service.Dispose();
             }
             var cancelEvidence=File.ReadAllText(Path.Combine(output,"cancel-wait-boundary.json"));
             status=cancelEvidence.Contains("\"sourceDisposeWithinThreeSeconds\": true")&&cancelEvidence.Contains("\"preparationWaitCanceled\": true")?"PASS_NORMAL_WRITER_WITH_NATIVE_CANCEL":"PARTIAL_NORMAL_WRITER_NATIVE_CANCEL_BOUNDARY_OPEN";
@@ -182,10 +177,15 @@ internal static class NormalExportProof
         finally
         {
             stage?.Release.TrySetResult();stage?.ContinueFrame.TrySetResult();confirmations.Stop();dialogsStop.Cancel();
-            if(saveModel is not null)saveModel.Requested-=saved;
-            if(stage is { } active)lock(gate)Write("active-stage-on-exit.json",new{active.Name,active.File,active.NativeOutputFile,active.Requests,active.Frames,active.Errors,active.Disposals,active.Cancellations,compilerCount=active.Service.CompilationCount,nativeCompleted=Value(nativeProgress,"IsCompleted"),nativeMessage=Public(nativeProgress,"Message")});
+            if(stage is not null&&nativeProgress is not null)
+            {
+                try{await Until(()=>Equals(Value(nativeProgress,"IsCompleted"),true),TimeSpan.FromSeconds(10));Log("harness-cleanup-native-terminal-after-gate-release");}
+                catch(TimeoutException){Log("harness-cleanup-native-terminal-NOT-PROVEN");}
+            }
+            if(stage is { } active)lock(gate)Write("active-stage-on-exit.json",new{active.Name,active.File,active.Requests,active.Frames,active.Errors,active.Disposals,active.Cancellations,compilerCount=active.Service.CompilationCount,nativeCompleted=Value(nativeProgress,"IsCompleted"),nativeMessage=Public(nativeProgress,"Message")});
             try{await automation;}catch(OperationCanceledException){}catch(Exception ex){status="FAIL";error+="\nOwned dialog automation: "+ex;}
             CompiledTachieSource.ProofPreparation=null;CompiledTachieSource.ProofLifecycle=null;CompiledTachieSource.ProofHostRequest=null;CompiledTachieSource.ProofHostUpdate=null;CompiledTachieSource.ProofHostError=null;
+            foreach(var service in services)service.Dispose();
             Write("export-results.json",new{status,assertions,error,hostVersion=typeof(Project).Assembly.GetName().Version?.ToString(),sourceHead=Environment.GetEnvironmentVariable("SOURCE_HEAD"),
                 productAssemblySha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(typeof(CompiledTachieSource).Assembly.Location))).ToLowerInvariant(),cases,
                 customWriterUsed=false,privateHostMethodsCalled=false,userAssetsUsed=false,policyChanged=false});
