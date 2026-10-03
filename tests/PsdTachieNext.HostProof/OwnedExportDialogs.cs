@@ -118,10 +118,17 @@ internal static class OwnedExportDialogs
                             log("native-save-submit-returned "+Path.GetFileName(current.Path));
                         }
                     }
-                    else if(current.ExpectedError&&save?.Current.Name=="OK")
+                    else if(current.ExpectedError)
                     {
                         if(texts.Any(text=>text.Contains("動画")&&text.Contains("出力")))
-                        {log("native-output-error-dialog "+string.Join(" | ",texts));((InvokePattern)save.GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
+                        {
+                            var ok=root.FindAll(TreeScope.Descendants,new AndCondition(
+                                new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),
+                                new PropertyCondition(AutomationElement.NameProperty,"OK"))).Cast<AutomationElement>()
+                                .Where(x=>x.Current.IsEnabled).ToArray();
+                            if(ok.Length==1&&submitted.Add((handle,"output-error")))
+                            {log("native-output-error-dialog "+string.Join(" | ",texts));((InvokePattern)ok[0].GetCurrentPattern(InvokePattern.Pattern)).Invoke();}
+                        }
                     }
                 }
                 catch(ElementNotAvailableException){}catch(InvalidOperationException ex){log("dialog-provider "+ex.Message);}
