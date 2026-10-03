@@ -2,6 +2,8 @@
 
 Inventory checked 2026-10-03: canonical [Lab main](https://github.com/ziro-lab/chat-native-work-lab-001/tree/f966709501aa19300ecbb3bd1a7615311c39cf20), plus PR and branch collections. Main alone did not contain all relevant Tachie/PSD work. Read fixed refs/results below before reuse; pending branches are not merged authority.
 
+Operational entry points: [reference sources/search order](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/YMM4_REFERENCE_SOURCES.md), [observation policy](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/YMM4_OBSERVATION_POLICY.md), [downstream feedback](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/DOWNSTREAM_FEEDBACK.md). These are maintained policies/examples, not extra native experiment evidence. Follow the short [search-to-feedback loop](DEVELOPMENT_WORKFLOW.md) and retain the fixed evidence identities below.
+
 ## Relevant public findings
 
 | Question | Fixed public reference | Observed scope and limits |

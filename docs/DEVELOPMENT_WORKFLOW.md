@@ -17,29 +17,15 @@ The current workflow reacts to main pushes and PRs, including documentation chan
 
 ## Lab lookup and return loop
 
-Canonical shared host evidence is [chat-native-work-lab-001](https://github.com/ziro-lab/chat-native-work-lab-001), not a product's private notes or a remembered API assumption.
+Canonical shared host evidence is [chat-native-work-lab-001](https://github.com/ziro-lab/chat-native-work-lab-001). Use its maintained policies rather than duplicate them here. The short entry loop is:
 
-Before researching:
+1. **Search.** Read [reference sources/search order](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/YMM4_REFERENCE_SOURCES.md), then existing main experiments, open/closed PRs, issues and branch/commit files; paginate and record fixed refs/date. Main-only or failed lookup cannot establish absence. Official samples/API indexes are discovery references, not runtime evidence.
+2. **Isolate the unresolved point.** State one version-sensitive host behavior and the product decision it blocks. Prefer public Plugin API, then public host/WPF; bounded reflection/Harmony needs a demonstrated gap. Propose one small synthetic experiment rather than duplicate product machinery or rediscover documented symbols.
+3. **Record evidence.** Follow [observation policy](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/YMM4_OBSERVATION_POLICY.md): exact host/version/hash, conditions, evidence type, source versus actual checkout, run/artifact identity, assertions, outcome and NOT PROVEN. Preserve failure-stage diagnostics; cleanup is separate from native cancellation. Static inventory and a PR's existence are not native PASS.
+4. **Confirm product integration.** Link fixed Lab evidence, implement the smallest justified behavior and independently re-test product lifetime/Undo/save/output where relevant. Record functional, UI/UX, package and human acceptance separately. A bounded host PASS does not imply full product PASS.
+5. **Return downstream feedback.** Use [downstream feedback](https://github.com/ziro-lab/chat-native-work-lab-001/blob/main/docs/DOWNSTREAM_FEEDBACK.md): adopted/rejected/superseded, product decision, integration result and any contradiction. Keep original Lab PASS limits intact. A newly proved reusable fact extends a narrow Lab experiment; product-specific observations remain here with their reference.
 
-- Read Lab AGENTS and YMM4 observation/reference/surface guides. Search main experiments, open **and closed** PRs, relevant issues and branch/commit files; paginate collections. Record search date and fixed refs. Main alone can miss current findings; a missing file/ref or failed lookup is not proof of absence.
-- Read the native conditions, PASS/NOT PROVEN, exact version, source/checkout SHA, run and artifact before adopting a result. A PR's existence or a member-name/IL inventory is not behavioral proof. A moving branch name needs a fixed commit reference.
-- Prefer public Plugin API, then public host/WPF surface. A bounded adapter/reflection approach needs a demonstrated gap and lifetime/error tests; Harmony is not a default. Samples/docs are references, not observed native behavior or code-copy permission.
-
-When evidence is missing, propose one narrow synthetic Lab experiment for the reusable host contract. Keep product preparation/cache/state machinery out of the shared probe unless needed to reproduce that contract. Search again before publishing to avoid duplicating another experiment.
-
-Return record:
-
-| Field | Required contents |
-| --- | --- |
-| Question | One uncertain public/native behavior and why the product depends on it |
-| Identity | Exact official host version, archive/executable hash, SDK, source SHA, checkout SHA if different, run ID/attempt, artifact ID/digest |
-| Conditions | Synthetic inputs, real host entry point, paused/playing/exporting state, ownership/lifetime, controlled gates and bounded timeout |
-| Result | Assertions and observed pixels/model/source/token/disposal/terminal states; PASS, FAIL, BLOCKED or NOT PROVEN as appropriate |
-| Failure | Original exception/native error/harness stage, cleanup separately from actual host cancellation; diagnostics retained on every exit |
-| Limits | What was not measured; static inventory vs runtime, synthetic vs normal workflow, physical-device/audio/dirty/focus boundaries |
-| Feedback | Fixed Lab PR/commit/run link; product downstream regression and any stricter/rejected interpretation |
-
-Newly verified reusable facts belong back in Lab with their limits, including negative/blocked results. Product-specific behavior stays here with a Lab reference. Downstream PASS does not automatically widen Lab PASS. If evidence conflicts, record both versions/conditions and reopen the boundary; do not silently select the favorable result.
+These canonical documents govern the detailed record fields and evidence distinctions. If results conflict, retain both versions/conditions and reopen the boundary. [The feedback queue](LAB_EVIDENCE.md) identifies this project's current missing questions; publishing those proposals is a separate authorized task.
 
 ## Alignment with other plugin development
 
@@ -47,8 +33,8 @@ The comparison uses public/currently relevant documentation rather than copying 
 
 | Reference | Adopted discipline here | Product-specific distinction |
 | --- | --- | --- |
-| [Template Placer](https://github.com/ziro-lab/ymm4-template-placer) | Requirements/design/plan/current-state authority, main-based Draft PR, cheap feedback then checkpoint/ready/release progression, native Undo/fidelity and explicit real-host acceptance | PSD preparation, GPU, notation and strict output need their own acceptance; another host version or release workflow is not inherited |
-| [Voice Quality Assist PR 16](https://github.com/ziro-lab/ymm4-voice-quality-assist/pull/16), source `f57a5358d11cd9778f9a6e4703f3e5b9645bce96` | Lab-first gates, PROVEN/CANDIDATE/BLOCKED distinctions, references separate from native evidence, fixed Lab links and scoped public-surface adapters | The exporting Source cancellation gap and paused equivalent-parameter route require PSD-specific regression |
+| [Template Placer research registry](https://github.com/ziro-lab/ymm4-template-placer/blob/main/docs/RESEARCH.md) and development docs | Reference/Lab/product evidence separation, requirements/design/plan/current-state authority, main-based Draft PR, cheap feedback then checkpoint/ready/release, native Undo/fidelity and real-host acceptance | PSD preparation, GPU, notation and strict output need their own acceptance; another host pin or release workflow is not inherited |
+| [Voice Quality Assist AGENTS](https://github.com/ziro-lab/ymm4-voice-quality-assist/blob/f57a5358d11cd9778f9a6e4703f3e5b9645bce96/AGENTS.md), [PR 16](https://github.com/ziro-lab/ymm4-voice-quality-assist/pull/16) | Lab-first gates, PROVEN/CANDIDATE/BLOCKED, reference/native separation, fixed Lab links and scoped public-surface adapters | Exporting Source cancellation and paused equivalent-parameter route require PSD-specific regression |
 | [Public Lab](https://github.com/ziro-lab/chat-native-work-lab-001) | Canonical reusable experiments, exact host/source/run provenance, synthetic inputs and NOT PROVEN | Product owns full functional/persistence/resource/user-workflow completion; Lab's bounded host PASS cannot substitute |
 
 ## Environment and publication
