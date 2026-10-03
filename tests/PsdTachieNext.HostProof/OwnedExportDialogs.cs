@@ -66,9 +66,20 @@ internal static class OwnedExportDialogs
                     if(current.Path is not null&&save?.Current.Name.Contains("保存")==true
                         &&root.Current.IsEnabled&&save.Current.IsEnabled&&!submitted.Contains((handle,current.Path)))
                     {
-                        var edit=root.FindFirst(TreeScope.Descendants,new AndCondition(
-                            new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit),
-                            new PropertyCondition(AutomationElement.AutomationIdProperty,"1001")));
+                        var edits=root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit))
+                            .Cast<AutomationElement>().Select(x=>new{name=x.Current.Name,id=x.Current.AutomationId,
+                                parent=TreeWalker.ControlViewWalker.GetParent(x)?.Current.AutomationId,
+                                value=x.TryGetCurrentPattern(ValuePattern.Pattern,out var value)?((ValuePattern)value).Current.Value:null}).ToArray();
+                        log("native-save-edit-inventory "+System.Text.Json.JsonSerializer.Serialize(edits));
+                        // AutomationId 1001 also occurs in the address controls. Resolve the
+                        // filename host first instead of selecting the first edit in the dialog.
+                        var filenameHost=root.FindFirst(TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.AutomationIdProperty,"FileNameControlHost"));
+                        if(filenameHost is null)throw new InvalidOperationException("Owned Save filename host was not found; do not submit an ambiguous dialog.");
+                        var matches=filenameHost.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit))
+                            .Cast<AutomationElement>().ToArray();
+                        if(matches.Length!=1)throw new InvalidOperationException("Owned Save filename edit is not unique; do not submit.");
+                        var edit=matches[0];
                         if(edit?.Current.IsEnabled==true&&edit.TryGetCurrentPattern(ValuePattern.Pattern,out var pattern)==true)
                         {
                             ((ValuePattern)pattern).SetValue(current.Path);
