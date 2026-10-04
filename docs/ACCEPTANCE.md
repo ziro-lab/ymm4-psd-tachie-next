@@ -66,7 +66,15 @@ Representative named fixtures in [preparation tests](../tests/PsdTachieNext.Prep
 
 Fixture names describe scoped assertions, not completion of every corresponding native gate. Renderer suites supply A23/A24 pixel/candidate cases; native A25-A29 need their separate evidence above.
 
+## Phase-C read-only notation candidate
+
+Local uncommitted source adds a shared, generation-local notation index. Synthetic runtime cases cover the pinned PSDTool prefix/suffix matrix, unresolved-name diagnostics, hierarchy and duplicate IDs, literal special characters, rejection of negative parent IDs instead of aliasing the root, concurrent/identical-copy sharing, source-generation separation, metadata release after disposal, and deep trees without recursive path construction. Existing preparation/core/runtime suites remain the regression boundary. Run identity and counts belong to the separate local candidate report; this is not a new CI or native-host result.
+
+T08 and phase C remain OPEN: visibility constraints, radio selection/defaults, flip pairing, durable references, serialization/escaping and native Undo are not exercised or implemented by this metadata candidate. H-A2 remains OPEN.
+
 ## Host gates
+
+An additional independent A09/A14 Windows regression exercises a real exclusive lock on a synthetic original source through the initial attempt and its single automatic retry. It checks the unstable-source diagnostic, retention of the previously prepared pixels, rejection of the stale publication stamp, snapshot cleanup, and recovery through an explicit new request after lock release. This is CPU preparation/OS-sharing coverage; it does not prove native Undo, visible preview retention or the normal writer's Cancel behavior. H-A2 remains OPEN.
 
 | Gate | Status | Next evidence |
 | --- | --- | --- |

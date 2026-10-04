@@ -400,6 +400,54 @@ try
         await session.Completion; Equal(2, attempts); Equal(1, session.AutomaticRetryCount);
         Equal(PreparationState.ReadyToRender, session.State); using var ready = session.TakeReady(out _); True(ready is not null);
     });
+    await Case("A09-A14-Windows-persistent-source-lock-retains-previous-and-explicit-reload-recovers", async () =>
+    {
+        var source = Source(); var original = File.ReadAllBytes(source.Path); var repository = Repository();
+        using var service = new SourcePreparationService(repository);
+        using var pool = new SharedDocumentPool(1024 * 1024, 1); using var session = new SourceSession();
+        var attempts = 0; var notifications = 0; var publications = 0;
+        session.BeforeRetry = _ => Task.CompletedTask;
+        session.Ready += _ => notifications++;
+        async Task<PreparedAppearanceLease> Prepare(RequestStamp stamp, CancellationToken token)
+        {
+            attempts++;
+            using var asset = await service.PrepareAsync(source, stamp.SourceRevision, token);
+            return asset.PrepareAppearance(pool);
+        }
+        session.Request(0, 0, 0, Prepare); await session.Completion;
+        using var previous = session.TakeReady(out var previousStamp); True(previous is not null);
+        var blockId = previous!.Plan.RequiredBlockIds.First(); var pixels = previous.GetBlock(blockId).ToArray();
+        True(session.TryPublish(previousStamp, () => publications++)); Equal(1, notifications);
+        using (var writer = new FileStream(source.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            // Keep a real OS sharing conflict through both attempts, rather than throwing a synthetic exception.
+            session.Request(0, 0, 0, Prepare, retryUnstable: true);
+            await session.Completion;
+            Equal(3, attempts); Equal(1, session.AutomaticRetryCount);
+            Equal(PreparationState.UnstableSource, session.State);
+            Equal(PreparationRecovery.WaitForStableSource, session.Diagnostic!.Recovery);
+            True(session.Diagnostic.HasPreviousOutput);
+            True(session.Error is SourceChangedDuringPreparationException { InnerException: IOException sharing }
+                && (sharing.HResult & 0xffff) is 32 or 33);
+            True(session.TakeReady(out _) is null); Equal(1, notifications); Equal(1, publications);
+            Equal(1L, repository.CompilationCount); Equal(0, Directory.GetDirectories(repository.SnapshotRoot).Length);
+            True(previous.GetBlock(blockId).Span.SequenceEqual(pixels));
+            True(!session.TryPublish(previousStamp, () => throw new Exception("Stale request published")));
+        }
+        // Releasing the lock alone does not invent a third automatic attempt; this is an explicit new request.
+        Equal(3, attempts);
+        session.Request(0, 0, 0, Prepare); await session.Completion;
+        Equal(4, attempts); Equal(0, session.AutomaticRetryCount); Equal(PreparationState.ReadyToRender, session.State);
+        True(session.Error is null); True(session.Diagnostic is null);
+        using var recovered = session.TakeReady(out var recoveredStamp); True(recovered is not null);
+        True(recoveredStamp.AssetRequestId > previousStamp.AssetRequestId);
+        True(recovered!.GetBlock(blockId).Span.SequenceEqual(pixels));
+        True(previous.GetBlock(blockId).Span.SequenceEqual(pixels));
+        True(session.TryPublish(recoveredStamp, () => publications++)); Equal(2, notifications); Equal(2, publications);
+        Equal(PreparationState.DisplayedCurrent, session.State); Equal(1L, repository.CompilationCount);
+        Equal(0, Directory.GetDirectories(repository.SnapshotRoot).Length);
+        True(original.AsSpan().SequenceEqual(File.ReadAllBytes(source.Path)));
+    });
     await Case("A11-clear-during-retry-settle-prevents-second-attempt", async () =>
     {
         using var session = new SourceSession(); var entered = Signal(); var canceled = Signal(); var attempts = 0;

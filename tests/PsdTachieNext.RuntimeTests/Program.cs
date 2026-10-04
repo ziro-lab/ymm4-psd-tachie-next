@@ -9,11 +9,13 @@ var root = Path.Combine(Path.GetTempPath(), "psd-next-runtime-" + Guid.NewGuid()
 Directory.CreateDirectory(root);
 try
 {
+    NotationCases.Run(Case, True, root);
     Case("same-generation-consumers-share-document-and-blocks", () =>
     {
         var dir = Store(7); using var pool = new SharedDocumentPool(128, 2);
         using var a = pool.Acquire(dir); using var b = pool.Acquire(dir);
         True(ReferenceEquals(a.Manifest, b.Manifest)); Equal(1, pool.Snapshot().ActiveDocuments);
+        True(ReferenceEquals(a.Notation, b.Notation)); Equal("same-name", a.Notation.Nodes[0].OriginalName);
         Equal(0L, pool.Snapshot().BlockReadCount);
         using (var x = a.AcquireBlock(0)) using (var y = b.AcquireBlock(0))
         {
