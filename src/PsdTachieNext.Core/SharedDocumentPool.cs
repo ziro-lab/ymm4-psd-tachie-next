@@ -16,6 +16,7 @@ public sealed class SharedDocumentPool : IDisposable
         public string Key { get; } = key;
         public CompiledDocument Document { get; } = document;
         public BlockCache Cache { get; } = new(document, budget);
+        public Lazy<PsdNotationIndex> Notation { get; } = new(() => new(document.Manifest));
         public List<string> Directories { get; } = [];
         public int References;
     }
@@ -70,7 +71,7 @@ public sealed class SharedDocumentPool : IDisposable
     private SharedDocumentLease Borrow(Entry entry)
     {
         entry.References++;
-        return new SharedDocumentLease(entry.Document.Manifest, id => AcquireBlock(entry, id), () => Release(entry));
+        return new SharedDocumentLease(entry.Document.Manifest, entry.Notation, id => AcquireBlock(entry, id), () => Release(entry));
     }
     private SharedBlockLease AcquireBlock(Entry entry, int id)
     {
@@ -120,13 +121,26 @@ public sealed class SharedDocumentLease : IDisposable
 {
     private readonly object gate = new();
     private CompiledManifest? manifest;
+    private Lazy<PsdNotationIndex>? notation;
     private Func<int, SharedBlockLease>? acquire;
     private Action? release;
-    internal SharedDocumentLease(CompiledManifest manifest, Func<int, SharedBlockLease> acquire, Action release)
-    { this.manifest = manifest; this.acquire = acquire; this.release = release; }
+    internal SharedDocumentLease(CompiledManifest manifest, Lazy<PsdNotationIndex> notation, Func<int, SharedBlockLease> acquire, Action release)
+    { this.manifest = manifest; this.notation = notation; this.acquire = acquire; this.release = release; }
     public CompiledManifest Manifest
     {
         get { lock (gate) { ObjectDisposedException.ThrowIf(manifest is null, this); return manifest; } }
+    }
+    public PsdNotationIndex Notation
+    {
+        get
+        {
+            Lazy<PsdNotationIndex> value;
+            lock (gate) { ObjectDisposedException.ThrowIf(notation is null, this); value = notation; }
+            // Name indexing stays outside both the lease and shared pool locks.
+            // A concurrent Dispose may close the document after this snapshot; the lazy
+            // factory reads only its immutable Manifest, never a stream or decoded block.
+            return value.Value;
+        }
     }
     public SharedBlockLease AcquireBlock(int id)
     {
@@ -137,7 +151,7 @@ public sealed class SharedDocumentLease : IDisposable
     public void Dispose()
     {
         Action? action;
-        lock (gate) { action = release; release = null; acquire = null; manifest = null; }
+        lock (gate) { action = release; release = null; acquire = null; manifest = null; notation = null; }
         action?.Invoke();
     }
 }
