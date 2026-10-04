@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "status": "LOCAL_SYNTHETIC_SOURCE_ONLY_REVIEW",
+  "date": "2026-10-04",
+  "baseCommit": "808a5fb5e22c218079ca3c0ef5c08525d51b682f",
+  "implementationFiles": 123,
+  "implementationAuditSha256": "4850e743d1a0863054d2ebe88d132e0aae32a9b7e45e9c950f3926402ffe13b7",
+  "host": {
+    "edition": "Lite",
+    "exeSha256": "3a2beb9890f0c3c88a4b0d17c2d8a6a5f1f974ce1d411a58e2769f9c8b473e9a",
+    "version": "4.56.1.0",
+    "sdk": "10.0.401"
+  },
+  "managed": {
+    "directionProjectionAssertions": 10,
+    "warpCases": 51,
+    "commitFailureCases": 16,
+    "pixelTolerance": 0,
+    "faceAssertions": 20,
+    "commitFailureAssertions": 65,
+    "parameterAssertions": 25,
+    "cpuAssertions": 1493,
+    "warpAssertions": 509,
+    "cpuCases": 162
+  },
+  "native": {
+    "oldCachedVmRetired": true,
+    "fixture": "synthetic eyes/mouth/clothes/hair",
+    "publicPendingState": {
+      "isUndoableAfter": false,
+      "historyChangedNotificationsBefore": 21,
+      "isRedoableAfter": true,
+      "historyChangedNotificationsAfter": 21,
+      "pendingEditPreserved": true,
+      "isUndoableBefore": false,
+      "isRedoableBefore": true,
+      "isSavedBefore": true,
+      "isSavedAfter": true
+    },
+    "savedThreeEnvelopes": true,
+    "productAssemblySha256": "27de86afd42fdfb2d0ec28ba19303c2a6ee728fbe7a9534ede81f64d26de84c4",
+    "reopenedEyeMouthEditsAndSingleUndo": true,
+    "limitations": [
+      "No arbitrary dirty-state/history-depth guarantee",
+      "No physical input or screenshot correspondence",
+      "Prior OpenProject timeout exact cause not established"
+    ],
+    "status": "PASS_NATIVE_REOPEN_PRODUCT_EYE_MOUTH_EDIT_UNDO",
+    "driverAssemblySha256": "a462ef9b1fb2f168a6a2c129e70a705e7b9f3c8b38f855ae55cde7699faebe34",
+    "assertions": 83,
+    "manualProductInfoFabricated": false,
+    "currentHostVmObtained": true,
+    "publicProofSourceSha256": "0a469f1fc3440df7dd160c0c6c34264d8203302f30bee8e982036dac63bff2b9"
+  },
+  "sdkPendingControls": [
+    {
+      "mode": "unrecorded-unrelated-user-edit",
+      "sendNotice": false,
+      "beforePending": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "beforeNotice": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "afterNotice": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "pendingPreserved": true,
+      "oneUndoRestoresUser": true,
+      "oneRedoRestoresUser": true,
+      "nativeMainIsSaved": "Not instantiated by SDK-only manager probe; public MainViewModel.IsSaved exists and needs native observation"
+    },
+    {
+      "mode": "unrecorded-unrelated-user-edit",
+      "sendNotice": true,
+      "beforePending": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "beforeNotice": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "afterNotice": {
+        "IsUndoable": false,
+        "IsRedoable": true
+      },
+      "pendingPreserved": true,
+      "oneUndoRestoresUser": true,
+      "oneRedoRestoresUser": true,
+      "nativeMainIsSaved": "Not instantiated by SDK-only manager probe; public MainViewModel.IsSaved exists and needs native observation"
+    }
+  ],
+  "wpfComponent": {
+    "assertions": 11,
+    "actualLoadedUnloaded": true,
+    "nativeHostView": false,
+    "dataContextSwapAndDispose": true,
+    "nonVisiblePresentation": true,
+    "preparedLeaseAcquisitionExercised": false,
+    "status": "PASS_WPF_COMPONENT_SUBSCRIPTION_LIFETIME"
+  },
+  "restoration": {
+    "bodyFiles": 704,
+    "allSha256Match": true,
+    "perTestHostCopy": false,
+    "userFiles": 370
+  },
+  "open": [
+    "realized native View and prepared-lease lifetime",
+    "visual acceptance",
+    "native Record exception and post-Capture failure latch",
+    "explicit stale old-face-clone native publication rejection",
+    "H-A2/native Cancel/full frame-varying output/full compatibility"
+  ],
+  "publicNativeCiArtifact": false,
+  "privateMaterialsIncluded": false,
+  "hostBinariesIncluded": false,
+  "canonicalApplied": false,
+  "commitPushRelease": false
+}

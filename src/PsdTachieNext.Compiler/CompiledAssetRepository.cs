@@ -226,13 +226,65 @@ public sealed class PreparedAssetLease : IDisposable
         CancellationToken token = default) => PrepareAppearanceWithinBudget(pool,long.MaxValue,enabled,token);
     public PreparedAppearanceLease PrepareAppearanceWithinBudget(SharedDocumentPool pool,long maximumDecodedBytes,
         IEnumerable<int>? enabled = null,CancellationToken token = default)
+        => PrepareAppearanceCore(pool, maximumDecodedBytes, enabled, null, prefixProfile: false, token);
+
+    /// <summary>Original-source prefix profile; optional state remains local to this generation/owner.</summary>
+    public PreparedAppearanceLease PreparePrefixAppearance(SharedDocumentPool pool,
+        PsdPrefixVisibility? visibility = null, CancellationToken token = default)
+        => PreparePrefixAppearanceWithinBudget(pool, long.MaxValue, visibility, token);
+
+    public PreparedAppearanceLease PreparePrefixAppearanceWithinBudget(SharedDocumentPool pool, long maximumDecodedBytes,
+        PsdPrefixVisibility? visibility = null, CancellationToken token = default)
+        => PrepareAppearanceCore(pool, maximumDecodedBytes, null, visibility, prefixProfile: true, token);
+
+    public PreparedAppearanceLease PrepareNotationAppearance(SharedDocumentPool pool,
+        PsdVisibilityState? visibility = null, CancellationToken token = default)
+        => PrepareNotationAppearanceWithinBudget(pool, long.MaxValue, visibility, token);
+
+    /// <summary>Worker-only saved-intent resolution, before acquiring required pixel blocks.</summary>
+    public PreparedAppearanceLease PrepareSavedAppearance(SharedDocumentPool pool, string assetIdentity,
+        PsdAppearanceSettings? settings, CancellationToken token = default)
+    {
+        ObjectDisposedException.ThrowIf(pin is null, this);
+        if (settings is null) return PrepareNotationAppearance(pool, token: token);
+        using var document = pool.Acquire(Directory);
+        var result = settings.Resolve(assetIdentity, PsdLayerReferenceIndex.Read(document, token));
+        if (!result.Succeeded) throw new PsdAppearanceRepairException(result);
+        return PrepareNotationAppearance(pool, result.State, token);
+    }
+
+    /// <summary>Resolve authored face parts before acquiring any appearance pixel blocks.</summary>
+    public PreparedAppearanceLease PrepareAppearanceStack(SharedDocumentPool pool, string assetIdentity,
+        PsdAppearanceStack stack, CancellationToken token = default)
+    {
+        ObjectDisposedException.ThrowIf(pin is null, this);
+        if (!stack.HasSettings) return PrepareNotationAppearance(pool, token: token);
+        using var document = pool.Acquire(Directory);
+        var result = stack.Resolve(assetIdentity, PsdLayerReferenceIndex.Read(document, token));
+        if (!result.Succeeded) throw new PsdAppearanceRepairException(result);
+        return PrepareNotationAppearance(pool, result.State, token);
+    }
+
+    public PreparedAppearanceLease PrepareNotationAppearanceWithinBudget(SharedDocumentPool pool, long maximumDecodedBytes,
+        PsdVisibilityState? visibility = null, CancellationToken token = default)
+        => PrepareAppearanceCore(pool, maximumDecodedBytes, null, null, prefixProfile: false, token,
+            notationVisibility: visibility, notationProfile: true);
+
+    private PreparedAppearanceLease PrepareAppearanceCore(SharedDocumentPool pool, long maximumDecodedBytes,
+        IEnumerable<int>? enabled, PsdPrefixVisibility? visibility, bool prefixProfile, CancellationToken token,
+        PsdVisibilityState? notationVisibility = null, bool notationProfile = false)
     {
         ObjectDisposedException.ThrowIf(pin is null, this);
         SharedDocumentLease? document = null;
         try
         {
             document = pool.Acquire(Directory);
-            var plan = RenderPlan.Create(document.Manifest, enabled);
+            token.ThrowIfCancellationRequested();
+            var plan = notationProfile
+                ? RenderPlan.CreateNotationVisibility(document.Manifest, notationVisibility ?? PsdVisibilityState.Create(document.Notation))
+                : prefixProfile
+                ? RenderPlan.CreatePrefixVisibility(document.Manifest, visibility ?? PsdPrefixVisibility.Create(document.Notation))
+                : RenderPlan.Create(document.Manifest, enabled);
             if(maximumDecodedBytes<=0)throw new ArgumentOutOfRangeException(nameof(maximumDecodedBytes));
             if(maximumDecodedBytes!=long.MaxValue&&plan.RequiredBlockIds.Sum(id=>plan.Manifest.Blocks[id].RawLength)>maximumDecodedBytes)
                 throw new CacheCapacityException("Selected-source decoded prefetch budget exceeded; real use remains available.");

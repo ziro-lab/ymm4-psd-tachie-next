@@ -10,6 +10,11 @@ Directory.CreateDirectory(root);
 try
 {
     NotationCases.Run(Case, True, root);
+    VisibilityCases.Run(Case, True, root);
+    FlipCases.Run(Case, True, root);
+    CheckpointCases.Run(Case, True, root);
+    SparseAppearanceCases.Run(Case, True, root);
+    AppearanceStackCases.Run(Case, True, root);
     Case("same-generation-consumers-share-document-and-blocks", () =>
     {
         var dir = Store(7); using var pool = new SharedDocumentPool(128, 2);

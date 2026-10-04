@@ -7,6 +7,7 @@ using YukkuriMovieMaker.Settings;
 using YukkuriMovieMaker.Commons;
 using YukkuriMovieMaker.Controls;
 using YukkuriMovieMaker.Plugin.Tachie;
+using YukkuriMovieMaker.UndoRedo;
 
 namespace PsdTachieNext.Ymm4;
 
@@ -29,18 +30,37 @@ public sealed class CompiledCharacterParameter : TachieCharacterParameterBase { 
 public sealed class CompiledItemParameter : TachieItemParameterBase, IFileItem
 {
     private SourceAssetRef? source;
+    private PsdAppearanceSettings? appearance;
     private long refreshRevision;
     private readonly WeakReference<CompiledItemParameter>? refreshParent;
     public CompiledItemParameter() { }
     private CompiledItemParameter(CompiledItemParameter original)
     {
-        source = original.source; refreshRevision = original.RefreshRevision;
+        source = original.source; appearance = original.appearance; refreshRevision = original.RefreshRevision;
         refreshParent = new(original);
     }
     [JsonIgnore, Browsable(false)]
     public long RefreshRevision => Interlocked.Read(ref refreshRevision);
     /// <summary>New parameter identity, identical persisted reference; no setters, Undo or prepared resources.</summary>
     public CompiledItemParameter CreateEquivalentRefreshClone() => new(this);
+    private long? preparationNotificationRevision;
+    internal bool IsPreparationNotification => preparationNotificationRevision == RefreshRevision;
+    /// <summary>UI-only preparation hint; keeps saved fields, identity and native history intact.</summary>
+    internal void NotifyPreparationReady()
+    {
+        // The SDK routes native refresh through the child UndoRedo event. Its same-value command
+        // is explicitly empty: no setters run, no history point is recorded, Redo remains available.
+        var hint = new UndoRedoPropertyChangedCommand<CompiledItemParameter, PsdAppearanceSettings?>(
+            this, nameof(Appearance), appearance, appearance);
+        if (!hint.IsEmpty) throw new InvalidOperationException("Preparation hint must have no native history action.");
+        preparationNotificationRevision = RefreshRevision;
+        try
+        {
+            InvokeUndoRedoCommandCreatedEvent(new UndoRedoEventArgs(hint));
+            OnPropertyChanged(nameof(Appearance));
+        }
+        finally { preparationNotificationRevision = null; }
+    }
     internal bool IsRefreshCloneOf(CompiledItemParameter original)
         => refreshParent?.TryGetTarget(out var parent) == true && ReferenceEquals(parent, original);
     [Browsable(false)]
@@ -52,6 +72,18 @@ public sealed class CompiledItemParameter : TachieItemParameterBase, IFileItem
             if (source == value) return;
             Interlocked.Increment(ref refreshRevision); // Includes A -> B -> A, even before a player Update.
             Set(ref source, value, nameof(Source), [nameof(File)]);
+        }
+    }
+    [Browsable(false), JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [JsonConverter(typeof(PsdAppearanceJsonConverter))]
+    public PsdAppearanceSettings? Appearance
+    {
+        get => appearance;
+        set
+        {
+            if (appearance == value) return;
+            Interlocked.Increment(ref refreshRevision);
+            Set(ref appearance, value, nameof(Appearance));
         }
     }
     [JsonIgnore]
@@ -96,6 +128,25 @@ public static class CompiledParameterRefreshBridge
 }
 public sealed class CompiledFaceParameter : TachieFaceParameterBase
 {
-    // No misleading expression controls before sparse-stack/animation behavior is implemented.
+    private PsdAppearanceSettings? appearance;
+    private long refreshRevision;
+    public CompiledFaceParameter() { }
+    private CompiledFaceParameter(CompiledFaceParameter original)
+    { appearance = original.appearance; refreshRevision = original.RefreshRevision; }
+    [JsonIgnore, Browsable(false)]
+    public long RefreshRevision => Interlocked.Read(ref refreshRevision);
+    public CompiledFaceParameter CreateEquivalentRefreshClone() => new(this);
+    [Browsable(false), JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [JsonConverter(typeof(PsdAppearanceJsonConverter))]
+    public PsdAppearanceSettings? Appearance
+    {
+        get => appearance;
+        set
+        {
+            if (appearance == value) return;
+            Interlocked.Increment(ref refreshRevision);
+            Set(ref appearance, value, nameof(Appearance));
+        }
+    }
     protected override IEnumerable<IAnimatable> GetAnimatables() => [];
 }

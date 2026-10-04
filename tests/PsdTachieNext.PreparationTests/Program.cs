@@ -25,6 +25,9 @@ try
 {
     prefetchMeasurements=await SelectedPrefetchCases.Run(root,Case,True);
     await ExportScopeCases.Run(root,Case,True);
+    await PrefixPreparationCases.Run(root,Case,True);
+    await FlipPreparationCases.Run(root,Case,True);
+    await SparsePreparationCases.Run(root,Case,True);
     await Case("refresh-owner-epoch-rejects-ABA-and-retirement", () =>
     {
         using var owner = new RefreshOwnerLifetime(); var first = owner.Capture();

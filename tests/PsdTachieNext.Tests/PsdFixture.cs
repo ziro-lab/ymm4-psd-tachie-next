@@ -21,14 +21,18 @@ internal static class PsdFixture
     private sealed record Layer(string Name, bool Hidden = false, int Divider = 0, bool Mask = false,
         byte Opacity = 255, string Blend = "norm", bool Clipping = false, byte Seed = 11, string? Unicode = null);
 
-    public static void Write(string path, bool psb = false, bool rle = false, bool groups = false, byte seed = 11)
+    public static void Write(string path, bool psb = false, bool rle = false, bool groups = false, byte seed = 11,
+        string visibleName = "visible", string hiddenName = "hidden", int[]? layerIds = null,
+        string[]? simpleLayerNames = null, bool[]? simpleLayerVisible = null)
     {
         // Top-to-bottom logical order; PSD file stores reversed record order.
-        var ordered = groups
+        var ordered = simpleLayerNames is not null
+            ? simpleLayerNames.Select((name,i)=>new Layer(name, Hidden: !simpleLayerVisible![i], Seed: (byte)(11+i*17))).ToArray()
+            : groups
             ? new[] { new Layer("Group", Divider: 1, Opacity: 191, Blend: "pass"),
                 new Layer("eye", Mask: true, Opacity: 173, Blend: "mul ", Clipping: true, Seed: seed, Unicode: "目/％"),
                 new Layer("eye", Hidden: true, Seed: 23), new Layer("End", Divider: 3), new Layer("body", Seed: 33) }
-            : new[] { new Layer("visible", Seed: seed), new Layer("hidden", Hidden: true, Seed: 23) };
+            : new[] { new Layer(visibleName, Seed: seed), new Layer(hiddenName, Hidden: true, Seed: 23) };
         using var records = new MemoryStream(); using var data = new MemoryStream();
         foreach (var layer in ordered.Reverse())
         {
@@ -72,6 +76,10 @@ internal static class PsdFixture
             {
                 using var tag = new MemoryStream(); U32(tag, layer.Unicode.Length); tag.Write(Encoding.BigEndianUnicode.GetBytes(layer.Unicode));
                 Tag(extra, "luni", tag.ToArray());
+            }
+            if(layerIds is not null)
+            {
+                using var tag=new MemoryStream();U32(tag,layerIds[Array.IndexOf(ordered,layer)]);Tag(extra,"lyid",tag.ToArray());
             }
             U32(records, checked((int)extra.Length)); extra.Position = 0; extra.CopyTo(records);
             foreach (var payload in payloads) data.Write(payload);

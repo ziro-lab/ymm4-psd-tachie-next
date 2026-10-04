@@ -13,7 +13,7 @@ namespace PsdTachieNext.Ymm4;
 
 /// <summary>
 /// Small public-API adapter. Uses the supported ITachieSource contract for this single-source checkpoint.
-/// Full multi-face input moves to ITachieSource2 with its own later evidence gate.
+/// Public ITachieSource2 faces contribute immutable sparse settings in Timeline layer order.
 /// Owns a separate D2D context on the supplied device: never begins/ends the caller's draw batch.
 /// Original CPU preparation is nonblocking for Paused requests; only host Update applies GPU candidates.
 /// </summary>
@@ -50,10 +50,29 @@ public sealed class CompiledTachieSource : ITachieSource2
     private readonly SourcePreparationService? injectedPreparation;
     private SourcePreparationService Preparation => injectedPreparation ?? DefaultPreparation.Value;
     internal static long DefaultCompilationCount => ProofPreparation?.CompilationCount ?? DefaultPreparation.Value.CompilationCount;
+    internal static SourcePreparationService PalettePreparation => ProofPreparation ?? DefaultPreparation.Value;
+    internal static SharedDocumentPool PalettePool => DefaultPool;
     internal bool UsesPreparation(SourcePreparationService service)=>ReferenceEquals(Preparation,service);
     private readonly SourceSession session = new();
     private PreparedAppearanceLease? displayed;
     private SourceAssetRef? requestedSource;
+    private PsdAppearanceSettings? requestedAppearance;
+    private FaceSnapshot[] requestedFaces = [];
+    private long requestedFaceOwnershipEpoch;
+    private bool FacesAreCurrent => requestedFaces.All(face => face.IsCurrent && HostPreparationBridge.IsFaceInputCurrent(face.Parameter, face.Layer))
+        && (requestedFaces.Length == 0 || requestedFaceOwnershipEpoch == HostPreparationBridge.FaceOwnershipEpoch);
+    private PsdAppearanceStack requestedStack = new(null);
+    private sealed record FaceSnapshot(CompiledFaceParameter Parameter, long Revision, PsdAppearanceSettings? Appearance, int Layer)
+    {
+        internal bool IsCurrent => Parameter.RefreshRevision == Revision && Parameter.Appearance == Appearance;
+        internal static FaceSnapshot Capture(CompiledFaceParameter parameter, int layer)
+        {
+            var revision = parameter.RefreshRevision;
+            var appearance = parameter.Appearance;
+            if (revision != parameter.RefreshRevision) throw new InvalidOperationException("Face settings changed during capture.");
+            return new(parameter, revision, appearance, layer);
+        }
+    }
     private long requestedRevision = -1;
     private IDisposable? watch;
     private bool subscribed, exporting;
@@ -86,6 +105,7 @@ public sealed class CompiledTachieSource : ITachieSource2
     public Exception? HostRecheckError => HostSourceRecheck.LastError;
     public Task PreparationCompletion => session.Completion;
     internal RequestStamp RefreshRequest => session.Current;
+    internal RenderPlan? ProofDisplayedPlan => displayed?.Plan;
 
     public CompiledTachieSource(ID2D1DeviceContext hostContext, SharedDocumentPool? sharedPool = null, SourcePreparationService? preparation = null)
     {
@@ -114,9 +134,10 @@ public sealed class CompiledTachieSource : ITachieSource2
         ITachieCharacterParameter characterParameter, ITachieItemParameter itemParameter,
         ITachieFaceParameter faceParameter, double kuchipaku)
     {
-        // Mouth/face parameters are deliberately not interpreted by this checkpoint.
         // This legacy contract has no Usage. Treat it strictly, never infer preview from timing.
-        UpdateOriginal((itemParameter as CompiledItemParameter)?.Source, strict: true, export: true);
+        var parameter = itemParameter as CompiledItemParameter;
+        UpdateOriginal(parameter?.Source, strict: true, export: true, appearance: parameter?.Appearance,
+            faces: faceParameter is CompiledFaceParameter face ? [FaceSnapshot.Capture(face, 0)] : []);
     }
 
     public void Update(TachieSourceDescription description)
@@ -125,7 +146,10 @@ public sealed class CompiledTachieSource : ITachieSource2
         var strict = description.Usage != TimelineSourceUsage.Paused;
         var parameter = description.Tachie.ItemParameter as CompiledItemParameter;
         var observation = parameter is null ? null : HostPreparationBridge.Observe(this, parameter);
-        try{UpdateOriginal(parameter?.Source, strict, description.Usage == TimelineSourceUsage.Exporting, observation);}
+        var faceEpoch = HostPreparationBridge.FaceOwnershipEpoch;
+        var faces = description.Tachie.Faces.Where(f => f.FaceParameter is CompiledFaceParameter)
+            .Select(f => FaceSnapshot.Capture((CompiledFaceParameter)f.FaceParameter, f.Layer)).ToArray();
+        try{UpdateOriginal(parameter?.Source, strict, description.Usage == TimelineSourceUsage.Exporting, observation, parameter?.Appearance, faces, faceEpoch);}
         catch(Exception ex){ProofHostError?.Invoke(this,description,ex);throw;}
         ProofHostUpdate?.Invoke(this, description);
     }
@@ -145,6 +169,7 @@ public sealed class CompiledTachieSource : ITachieSource2
             return !disposed && !exporting && ReferenceEquals(Volatile.Read(ref pendingRefresh), observation)
                 && observation.Parameter.RefreshRevision == observation.ParameterRevision
                 && observation.Parameter.Source == observation.Source && requestedSource == observation.Source
+                && FacesAreCurrent
                 && session.Current == stamp && session.State == PreparationState.ReadyToRender
                 && requestedSource is not null && Preparation.Revision(requestedSource.Path) == stamp.SourceRevision;
         }
@@ -160,7 +185,7 @@ public sealed class CompiledTachieSource : ITachieSource2
             // finish before its CPU cache is reused by a distinct request generation.
             if (disposed || exporting || old is null || old.Tickets.Length != 0
                 || session.State != PreparationState.ReadyToRender
-                || old.Parameter.RefreshRevision != old.ParameterRevision || old.Parameter.Source != old.Source
+                || old.Parameter.RefreshRevision != old.ParameterRevision || old.Parameter.Source != old.Source || !FacesAreCurrent
                 || requestedSource != old.Source || old.Source is null) return;
             var next = HostPreparationBridge.Observe(this, old.Parameter);
             if (next.Tickets.Length == 0) return;
@@ -189,14 +214,16 @@ public sealed class CompiledTachieSource : ITachieSource2
         }
         requestedSource = source; requestedRevision = revision;
         Volatile.Write(ref pendingRefresh, lastHostObservation);
-        session.Request(revision, settingsRevision, 0, (stamp, token) => PrepareOriginal(source, stamp, token),
+        var appearance = requestedStack; // Immutable request snapshot, including unknown/unsupported intent.
+        session.Request(revision, settingsRevision, 0, (stamp, token) => PrepareOriginal(source, stamp, token, appearance),
             retryUnstable: !exporting, readSourceRevision: () => Preparation.Revision(source.Path));
     }
-    private async Task<PreparedAppearanceLease> PrepareOriginal(SourceAssetRef source, RequestStamp stamp, CancellationToken token)
+    private async Task<PreparedAppearanceLease> PrepareOriginal(SourceAssetRef source, RequestStamp stamp, CancellationToken token,
+        PsdAppearanceStack appearance)
     {
         var prefetch=Prefetch;
         PreparedAppearanceLease ready;
-        var promoted=prefetch is null?null:await prefetch.TakeVerifiedReadyAsync(source,stamp.SourceRevision,token).ConfigureAwait(false);
+        var promoted=prefetch is null || appearance.HasSettings?null:await prefetch.TakeVerifiedReadyAsync(source,stamp.SourceRevision,token).ConfigureAwait(false);
         if(promoted is not null)ready=promoted;
         else
         {
@@ -205,7 +232,7 @@ public sealed class CompiledTachieSource : ITachieSource2
             using var actualUse=prefetch?.BeginActualUse();
             using var asset = await preparation.ConfigureAwait(false);
             if(actualUse is not null)await actualUse.Retirement.WaitAsync(token).ConfigureAwait(false);
-            ready = await Task.Run(() => asset.PrepareAppearance(pool, token: token), token).ConfigureAwait(false);
+            ready = await Task.Run(() => asset.PrepareAppearanceStack(pool, source.AssetIdentity, appearance, token), token).ConfigureAwait(false);
         }
         if (Preparation.Revision(source.Path) != stamp.SourceRevision)
         { ready.Dispose(); throw new SourceChangedDuringPreparationException("block準備中に素材revisionが変更されました。"); }
@@ -265,7 +292,7 @@ public sealed class CompiledTachieSource : ITachieSource2
         }
     }
     private void UpdateOriginal(SourceAssetRef? source, bool strict, bool export,
-        HostPreparationBridge.Observation? observation = null)
+        HostPreparationBridge.Observation? observation = null, PsdAppearanceSettings? appearance = null, FaceSnapshot[]? faces = null, long? faceEpoch = null)
     {
         lock (owner)
         {
@@ -288,6 +315,23 @@ public sealed class CompiledTachieSource : ITachieSource2
                 if (changedOwner) settingsRevision++;
                 lastHostObservation = observation;
             }
+            faces ??= [];
+            faceEpoch ??= HostPreparationBridge.FaceOwnershipEpoch;
+            if (requestedAppearance != appearance || !requestedFaces.SequenceEqual(faces)
+                || (faces.Length != 0 && requestedFaceOwnershipEpoch != faceEpoch.Value))
+            {
+                if (exporting && export)
+                {
+                    exportScope!.RejectChange();
+                    throw new IOException("Saved appearance changed during output; restart the output job.");
+                }
+                if (!changedOwner) settingsRevision++;
+                changedOwner = true;
+            }
+            requestedAppearance = appearance;
+            requestedFaces = faces;
+            requestedFaceOwnershipEpoch = faceEpoch.Value;
+            requestedStack = new(appearance, faces.Where(f => f.Appearance is not null).Select(f => new PsdAppearanceContribution(f.Layer, f.Appearance!)));
             if(exporting&&export)
                 exportScope!.Validate(source,session.Current,source is null?-1:Preparation.Revision(source.Path),settingsRevision);
             if (source is null) { Clear(); return; }
@@ -326,6 +370,8 @@ public sealed class CompiledTachieSource : ITachieSource2
             }
             if (strict && session.State != PreparationState.DisplayedCurrent)
                 throw new InvalidOperationException("要求した世代の立ち絵が未準備です。古い画像で出力を続行できません。");
+            if (strict && !FacesAreCurrent)
+                throw new InvalidOperationException("Face settings changed during the strict draw interval.");
             if(export)exportScope!.Validate(source,session.Current,Preparation.Revision(source.Path),settingsRevision);
         }
     }
@@ -342,6 +388,8 @@ public sealed class CompiledTachieSource : ITachieSource2
             candidate = new TreeCompiledRenderer(renderContext, ready, deviceEpoch: stamp.DeviceEpoch);
             candidate.UpdatePrepared(ready);
             BeforeOriginalPublication?.Invoke();
+            if (!FacesAreCurrent)
+                throw new InvalidOperationException("Face settings changed before publication; a fresh host Update is required.");
             if (requestedSource is not null && Preparation.Revision(requestedSource.Path) != stamp.SourceRevision)
                 throw new SourceChangedDuringPreparationException("GPU候補の準備中に素材revisionが変更されました。古い候補を公開せず再読込が必要です。");
             var published = session.TryPublish(stamp, () =>
@@ -360,7 +408,8 @@ public sealed class CompiledTachieSource : ITachieSource2
         catch (SourceChangedDuringPreparationException) when (!exporting && requestedSource is not null)
         {
             ready.Dispose(); var source = requestedSource;
-            if (session.RetryChangedCandidate(stamp, Preparation.Revision(source.Path), (next, token) => PrepareOriginal(source, next, token))) return false;
+            var appearance = requestedStack;
+            if (session.RetryChangedCandidate(stamp, Preparation.Revision(source.Path), (next, token) => PrepareOriginal(source, next, token, appearance))) return false;
             session.Fail(stamp, new SourceChangedDuringPreparationException("素材の更新が収束していません。自動再試行は1回で終了しました。"));
             throw;
         }
@@ -423,7 +472,8 @@ public sealed class CompiledTachieSource : ITachieSource2
         center.SetInput(0, empty, true); center.TransformMatrix = Matrix3x2.Identity;
         watch?.Dispose(); watch = null;
         if (subscribed) { Preparation.SourceInvalidated -= OnSourceChanged; subscribed = false; }
-        requestedSource = null; requestedRevision = -1; exporting = false; Volatile.Write(ref exportScope,null);
+        requestedSource = null; requestedAppearance = null; requestedRevision = -1; exporting = false; Volatile.Write(ref exportScope,null);
+        requestedFaces = []; requestedStack = new(null); requestedFaceOwnershipEpoch = 0;
         try { renderer?.Dispose(); } finally { renderer = null; lease?.Dispose(); lease = null; displayed?.Dispose(); displayed = null; }
         currentManifest = null; selection = null; hasSelection = false;
     }

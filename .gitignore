@@ -10,6 +10,10 @@
 !/docs/DEVELOPMENT_WORKFLOW.md
 !/docs/LAB_EVIDENCE.md
 !/docs/NORMAL_EXPORT_EVIDENCE.md
+!/docs/VISIBILITY_CHECKPOINT.md
+!/docs/SPARSE_APPEARANCE.md
+!/docs/NATIVE_APPEARANCE.md
+!/docs/APPEARANCE_EDIT_FAILURES.md
 !/LICENSE
 !/THIRD_PARTY_NOTICES.md
 !/.gitignore
@@ -50,3 +54,10 @@ compiled*/
 *.zip
 *.log
 manifest.json
+
+# Explicit reviewed checkpoint docs and first-party standalone proof sources only.
+!/docs/PALETTE_CHECKPOINT.md
+!/docs/PALETTE_SYNTHETIC_EVIDENCE.json
+!/docs/proofs/PaletteNativeProof.cs
+!/docs/proofs/SdkPendingProof.cs
+!/docs/proofs/WpfLifetimeProof.cs

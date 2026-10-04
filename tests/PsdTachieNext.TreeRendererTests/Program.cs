@@ -21,6 +21,300 @@ try
     using var device = factory.CreateDevice(dxgi);
     using var context = device.CreateDeviceContext(DeviceContextOptions.None);
 
+    Case("C-prefix-prepared-radio-switch-and-hidden-parent-no-recompose", () =>
+    {
+        var dir = Save([G(S(0,0,255) with { Name="*same" }, S(0,255,0) with { Name="*same",Visible=false })
+            with { Visible=false }, S(255,0,0) with { Name="!backdrop",Visible=false }]);
+        using var pool = new SharedDocumentPool(4096, 1); using var source = pool.Acquire(dir);
+        var state = PsdPrefixVisibility.Create(source.Notation);
+        using var first = PreparedAppearanceLease.Prepare(source, RenderPlan.CreatePrefixVisibility(source.Manifest,state));
+        using var renderer = new TreeCompiledRenderer(context,first);
+        Check(renderer.UpdatePrepared(first)); Bytes([255,0,0,255], renderer.Readback());
+        var pointer = renderer.Output!.NativePointer; var reads = pool.Snapshot().BlockReadCount;
+        state = state.SetVisible(2,true);
+        using (var hidden = PreparedAppearanceLease.Prepare(source, RenderPlan.CreatePrefixVisibility(source.Manifest,state)))
+        {
+            Check(!renderer.UpdatePrepared(hidden)); Check(renderer.Output.NativePointer==pointer);
+            Check(pool.Snapshot().BlockReadCount==reads && renderer.CompositionCount==1);
+        }
+        state = state.SetVisible(0,true);
+        using (var green = PreparedAppearanceLease.Prepare(source, RenderPlan.CreatePrefixVisibility(source.Manifest,state)))
+        { Check(renderer.UpdatePrepared(green)); Bytes([0,255,0,255], renderer.Readback()); }
+        state = state.SetVisible(1,true);
+        using (var red = PreparedAppearanceLease.Prepare(source, RenderPlan.CreatePrefixVisibility(source.Manifest,state)))
+        { Check(renderer.UpdatePrepared(red)); Bytes([0,0,255,255], renderer.Readback()); }
+        Check(renderer.CompositionCount==3 && pool.Snapshot().BlockReadCount==3);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-flip-whole-canvas-four-states-key-and-context-restoration", () =>
+    {
+        byte[] red=[0,0,255,255],green=[0,255,0,255],blue=[255,0,0,255],white=[255,255,255,255];
+        byte[] Grid(params byte[][] pixels)=>pixels.SelectMany(p=>p).ToArray();
+        var dir=Save([new(Pixels:Grid(red,green,blue,white),Bounds:new(0,0,2,2),Name:"plain")],2,2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        var sentinel=Matrix3x2.CreateTranslation(7,9);context.Transform=sentinel;
+        try
+        {
+            foreach(var row in new[] {
+                (PsdFlipState.None,Grid(red,green,blue,white)),(PsdFlipState.X,Grid(green,red,white,blue)),
+                (PsdFlipState.Y,Grid(blue,white,red,green)),(PsdFlipState.XY,Grid(white,blue,green,red))})
+            {
+                using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state.WithFlip(row.Item1)));
+                Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());Check(context.Transform==sentinel);
+                var pointer=renderer.Output!.NativePointer;Check(!renderer.UpdatePrepared(ready));Check(renderer.Output.NativePointer==pointer);
+            }
+            Check(renderer.CompositionCount==4 && pool.Snapshot().BlockReadCount==1);
+            Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+        } finally {context.Transform=Matrix3x2.Identity;}
+    });
+    Case("C-flip-counterpart-X-Y-shared-suffix-and-separate-XY-pixels", () =>
+    {
+        byte[] red=[0,0,255,255],green=[0,255,0,255],blue=[255,0,0,255],white=[255,255,255,255];
+        byte[] Grid(params byte[][] pixels)=>pixels.SelectMany(p=>p).ToArray();
+        var dir=Save([new(Pixels:Grid(red,green,blue,white),Bounds:new(0,0,2,2),Name:"body"),
+            new(Pixels:Grid(blue,red,white,green),Bounds:new(0,0,2,2),Name:"body:flipx:flipy",Visible:false),
+            new(Pixels:Grid(green,white,red,blue),Bounds:new(0,0,2,2),Name:"body:flipxy",Visible:false)],2,2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        foreach(var row in new[] {(PsdFlipState.None,Grid(red,green,blue,white)),(PsdFlipState.X,Grid(red,blue,green,white)),
+            (PsdFlipState.Y,Grid(white,green,blue,red)),(PsdFlipState.XY,Grid(blue,red,white,green))})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state.WithFlip(row.Item1)));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+        }
+        Check(renderer.CompositionCount==4 && pool.Snapshot().BlockReadCount==3);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-flip-group-prefix-duplicate-radio-choice-survives-hidden-parent", () =>
+    {
+        var dir=Save([G(G(S(0,0,255) with {Name="*same"},S(0,255,0) with {Name="*same",Visible=false}) with {Name="!body",Visible=false},
+            G(S(255,0,0) with {Name="*same",Visible=false,Bounds=new(1,0,1,1)},
+                S(0,255,255) with {Name="*same",Bounds=new(1,0,1,1)}) with {Name="!body:flipx",Visible=false}) with {Name="parent",Visible=false}],2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation).SetVisible(2,true).WithFlip(PsdFlipState.X);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        Check(renderer.UpdatePrepared(initial));Bytes([0,0,0,0,0,0,0,0],renderer.Readback());
+        Check(pool.Snapshot().BlockReadCount==0 && state.IsLocallyVisible(2));
+        state=state.SetVisible(0,true);
+        using(var blueReady=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state)))
+        {Check(renderer.UpdatePrepared(blueReady));Bytes([255,0,0,255,0,0,0,0],renderer.Readback());}
+        state=state.SetVisible(3,true);
+        using(var yellowReady=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state)))
+        {Check(renderer.UpdatePrepared(yellowReady));Bytes([0,255,255,255,0,0,0,0],renderer.Readback());}
+        using(var greenReady=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state.WithFlip(PsdFlipState.None))))
+        {Check(renderer.UpdatePrepared(greenReady));Bytes([0,255,0,255,0,0,0,0],renderer.Readback());}
+        Check(renderer.CompositionCount==4 && pool.Snapshot().BlockReadCount==3);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-flip-initial-None-missing-nested-base-normalizes-once-pixels", () =>
+    {
+        var dir=Save([G(S(0,0,255) with {Name="part",Visible=false},
+                S(0,255,0) with {Name="part:flipx",Bounds=new(1,0,1,1)})
+                with {Name="body",Visible=false,Bounds=new(0,0,2,1)},
+            G(S(255,0,0) with {Name="part:flipx",Bounds=new(1,0,1,1)})
+                with {Name="body:flipx",Bounds=new(0,0,2,1)}],2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        byte[] both=[0,0,255,255,0,255,0,255],redLeft=[0,0,255,255,0,0,0,0];
+        foreach(var row in new[]{(PsdFlipState.None,both),(PsdFlipState.X,new byte[]{255,0,0,255,0,0,0,0}),
+            (PsdFlipState.None,both),(PsdFlipState.Y,redLeft),(PsdFlipState.None,both),
+            (PsdFlipState.XY,new byte[]{0,0,0,0,0,0,255,255}),(PsdFlipState.None,both)})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state.WithFlip(row.Item1)));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+        }
+        Check(renderer.CompositionCount==7 && pool.Snapshot().BlockReadCount==3);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-direction-initial-common-radio-alias-keeps-exclusive-pixels-and-roundtrips", () =>
+    {
+        var dir=Save([G(S(0,0,255) with {Name="*part",Visible=false},
+                S(0,255,0) with {Name="*part:flipx",Bounds=new(1,0,1,1)})
+                with {Name="body",Visible=false,Bounds=new(0,0,2,1)},
+            G(S(255,0,0) with {Name="*part:flipx",Bounds=new(1,0,1,1)})
+                with {Name="body:flipx",Bounds=new(0,0,2,1)}],2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation);
+        Check(state.EnabledNodeIds.SequenceEqual([0,2,4]));
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        byte[] greenRight=[0,0,0,0,0,255,0,255],redLeft=[0,0,255,255,0,0,0,0];
+        var current=state;
+        foreach(var row in new[]{(PsdFlipState.None,greenRight),(PsdFlipState.X,new byte[]{255,0,0,255,0,0,0,0}),
+            (PsdFlipState.None,greenRight),(PsdFlipState.Y,redLeft),(PsdFlipState.None,greenRight),
+            (PsdFlipState.XY,new byte[]{0,0,0,0,0,0,255,255}),(PsdFlipState.None,greenRight)})
+        {
+            current=current.WithFlip(row.Item1);
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,current));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+            Check(!current.IsLocallyVisible(1) && current.IsLocallyVisible(2));
+        }
+        var edited=state.WithFlip(PsdFlipState.X).SetVisible(1,true).WithFlip(PsdFlipState.None);
+        using(var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,edited)))
+        {Check(renderer.UpdatePrepared(ready));Bytes(redLeft,renderer.Readback());}
+        using(var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state)))
+        {Check(renderer.UpdatePrepared(ready));Bytes(greenRight,renderer.Readback());}
+        Check(renderer.CompositionCount==9 && pool.Snapshot().BlockReadCount==3);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-flip-edited-expression-returns-latest-normal-choice-and-snapshot-pixels", () =>
+    {
+        var dir=Save([G(S(0,0,255) with {Name="*same"},S(0,255,0) with {Name="*same",Visible=false})
+                with {Name="body",Bounds=new(0,0,2,2)},
+            G(S(255,0,0) with {Name="*same",Bounds=new(1,0,1,1)},
+                S(0,255,255) with {Name="*same",Visible=false,Bounds=new(1,0,1,1)})
+                with {Name="body:flipx",Visible=false,Bounds=new(0,0,2,2)},
+            G(S(255,255,255) with {Name="*same",Bounds=new(0,1,1,1)},
+                S(255,0,255) with {Name="*same",Visible=false,Bounds=new(0,1,1,1)})
+                with {Name="body:flipy",Visible=false,Bounds=new(0,0,2,2)},
+            G(S(0,0,255) with {Name="*same",Bounds=new(1,1,1,1)},
+                S(255,255,0) with {Name="*same",Visible=false,Bounds=new(1,1,1,1)})
+                with {Name="body:flipxy",Visible=false,Bounds=new(0,0,2,2)}],2,2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var original=PsdVisibilityState.CreateVerified(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,original));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        byte[] Pixel(byte b,byte g,byte r)=>[b,g,r,255,0,0,0,0,0,0,0,0,0,0,0,0];
+        foreach(var row in new[]{(PsdFlipState.X,Pixel(255,0,0),Pixel(0,255,255)),
+            (PsdFlipState.Y,Pixel(255,255,255),Pixel(255,0,255)),(PsdFlipState.XY,Pixel(0,0,255),Pixel(255,255,0))})
+        {
+            var before=original.WithFlip(row.Item1);var edited=before.SetVisible(2,true);
+            var returned=edited.WithFlip(PsdFlipState.None);
+            foreach(var snapshot in new[]{(before,row.Item2),(edited,row.Item3),(returned,Pixel(0,255,0)),
+                (before,row.Item2),(edited,row.Item3),(returned,Pixel(0,255,0))})
+            {
+                using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,snapshot.Item1));
+                Check(renderer.UpdatePrepared(ready));Bytes(snapshot.Item2,renderer.Readback());
+            }
+            Check(before.IsLocallyVisible(1) && edited.IsLocallyVisible(2));
+        }
+        Check(renderer.CompositionCount==18 && pool.Snapshot().BlockReadCount==8);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-direction-only-root-force-memory-scopes-hidden-parent-and-pixels", () =>
+    {
+        var dir=Save([G(S(255,255,255) with {Name="base"},
+            S(0,0,255) with {Name="!shine:flipx",Visible=false,Bounds=new(1,0,1,1)},
+            S(255,0,0) with {Name="cape:flipy",Visible=false,Bounds=new(0,1,1,1)},
+            S(0,255,0) with {Name="pose:flipxy",Visible=false,Bounds=new(1,1,1,1)})
+            with {Name="parent",Visible=false,Bounds=new(0,0,2,2)}],2,2);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var state=PsdVisibilityState.Create(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        Check(renderer.UpdatePrepared(initial));Bytes(new byte[16],renderer.Readback());
+        var pointer=renderer.Output!.NativePointer;
+        state=state.SetVisible(3,true).SetVisible(4,true);
+        using(var hidden=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state)))
+        {Check(!renderer.UpdatePrepared(hidden));Check(renderer.Output.NativePointer==pointer && pool.Snapshot().BlockReadCount==0);}
+        byte[] clear=[0,0,0,0],white=[255,255,255,255],red=[0,0,255,255],blue=[255,0,0,255],green=[0,255,0,255];
+        byte[] Grid(params byte[][] p)=>p.SelectMany(v=>v).ToArray();
+        state=state.SetVisible(0,true);
+        foreach(var row in new[]{(PsdFlipState.None,Grid(white,clear,clear,clear)),(PsdFlipState.X,Grid(red,white,clear,clear)),
+            (PsdFlipState.Y,Grid(blue,clear,white,clear)),(PsdFlipState.XY,Grid(green,clear,clear,white)),
+            (PsdFlipState.None,Grid(white,clear,clear,clear))})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,state.WithFlip(row.Item1)));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+            Check(state.IsLocallyVisible(2) && state.IsLocallyVisible(3) && state.IsLocallyVisible(4));
+        }
+        var snapshot=state.WithFlip(PsdFlipState.X).SetVisible(0,false);
+        using(var hidden=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,snapshot)))
+        {Check(renderer.UpdatePrepared(hidden));Bytes(new byte[16],renderer.Readback());}
+        using(var restored=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,snapshot.SetVisible(0,true))))
+        {Check(renderer.UpdatePrepared(restored));Bytes(Grid(red,white,clear,clear),renderer.Readback());}
+        Check(renderer.CompositionCount==8 && pool.Snapshot().BlockReadCount==4);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-direction-radio-survives-transfer-common-return-and-snapshot-pixels", () =>
+    {
+        var dir=Save([G(S(0,0,255) with {Name="*common"},S(0,255,0) with {Name="*other",Visible=false}) with {Name="body"},
+            G(S(0,255,255) with {Name="*common"},S(255,255,0) with {Name="*other",Visible=false},
+                S(255,0,0) with {Name="*extra",Visible=false}) with {Name="body:flipx",Visible=false},
+            G(S(0,255,255) with {Name="*common"},S(255,255,0) with {Name="*other",Visible=false},
+                S(255,0,255) with {Name="*extra",Visible=false}) with {Name="body:flipy",Visible=false},
+            G(S(0,255,255) with {Name="*common"},S(255,255,0) with {Name="*other",Visible=false},
+                S(255,255,255) with {Name="*extra",Visible=false}) with {Name="body:flipxy",Visible=false}]);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var original=PsdVisibilityState.Create(source.Notation);
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,original));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        Check(renderer.UpdatePrepared(initial));Bytes([0,0,255,255],renderer.Readback());
+        var latent=original.SetVisible(6,true);
+        using(var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,latent)))
+        {Check(!renderer.UpdatePrepared(ready));Check(renderer.CompositionCount==1 && pool.Snapshot().BlockReadCount==1);}
+        var remembered=latent.WithFlip(PsdFlipState.Y).SetVisible(10,true).WithFlip(PsdFlipState.XY).SetVisible(14,true);
+        var edited=remembered.WithFlip(PsdFlipState.X).SetVisible(2,true);
+        var clearY=edited.WithFlip(PsdFlipState.Y).SetVisible(2,true);
+        byte[] red=[0,0,255,255],green=[0,255,0,255],blue=[255,0,0,255],magenta=[255,0,255,255],white=[255,255,255,255],cyan=[255,255,0,255];
+        foreach(var row in new[]{(remembered.WithFlip(PsdFlipState.X),blue),(remembered.WithFlip(PsdFlipState.Y),magenta),
+            (remembered.WithFlip(PsdFlipState.XY),white),(remembered.WithFlip(PsdFlipState.None),red),
+            (edited,cyan),(edited.WithFlip(PsdFlipState.None),green),(edited.WithFlip(PsdFlipState.Y),cyan),
+            (edited.WithFlip(PsdFlipState.XY),cyan),(clearY,cyan),(clearY.WithFlip(PsdFlipState.None),green),
+            (remembered.WithFlip(PsdFlipState.X),blue),(remembered.WithFlip(PsdFlipState.None),red),
+            (edited,cyan),(clearY.WithFlip(PsdFlipState.None),green)})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,row.Item1));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+        }
+        Check(renderer.CompositionCount==15 && pool.Snapshot().BlockReadCount==8);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
+    Case("C-radio-priority-shared-B-reverse-A-hidden-parent-scope-and-snapshot-pixels", () =>
+    {
+        var dir=Save([G(S(255,255,255) with {Name="*base",Visible=false},
+            S(0,0,255) with {Name="*A:flipx"},S(0,255,0) with {Name="*C:flipy",Visible=false},
+            S(255,0,0) with {Name="*D:flipxy",Visible=false},
+            S(0,255,255) with {Name="*B:flipx:flipy",Visible=false}) with {Name="parent"}]);
+        using var pool=new SharedDocumentPool(4096,1);using var source=pool.Acquire(dir);
+        var original=PsdVisibilityState.Create(source.Notation);
+        var remembered=original.WithFlip(PsdFlipState.Y).SetVisible(3,true).WithFlip(PsdFlipState.XY).SetVisible(4,true);
+        var shared=remembered.WithFlip(PsdFlipState.Y).SetVisible(5,true);
+        var reverse=shared.WithFlip(PsdFlipState.X).SetVisible(2,true);
+        Check(reverse.RadioSelectionScopes[5]==PsdDirectionScope.Y);
+        Check(shared.RadioSelectionScopes[5]==(PsdDirectionScope.X|PsdDirectionScope.Y));
+        byte[] white=[255,255,255,255],red=[0,0,255,255],green=[0,255,0,255],blue=[255,0,0,255],yellow=[0,255,255,255];
+        using var initial=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,original));
+        using var renderer=new TreeCompiledRenderer(context,initial);
+        foreach(var row in new[]{(original,white),(original.WithFlip(PsdFlipState.X),red),
+            (remembered.WithFlip(PsdFlipState.Y),green),(remembered.WithFlip(PsdFlipState.XY),blue),
+            (remembered.WithFlip(PsdFlipState.None),white),(shared.WithFlip(PsdFlipState.X),yellow),
+            (shared.WithFlip(PsdFlipState.Y),yellow),(shared.WithFlip(PsdFlipState.XY),blue),
+            (shared.WithFlip(PsdFlipState.None),white),(reverse.WithFlip(PsdFlipState.X),red),
+            (reverse.WithFlip(PsdFlipState.Y),yellow),(reverse.WithFlip(PsdFlipState.XY),blue),
+            (reverse.WithFlip(PsdFlipState.None),white)})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,row.Item1));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+        }
+        var hidden=reverse.WithFlip(PsdFlipState.Y).SetVisible(0,false);
+        Check(ReferenceEquals(hidden.RadioSelectionScopes,reverse.RadioSelectionScopes));
+        using(var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,hidden)))
+        {Check(renderer.UpdatePrepared(ready));Bytes([0,0,0,0],renderer.Readback());}
+        var hiddenShared=hidden.SetVisible(5,true);
+        using(var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,hiddenShared)))
+        {Check(!renderer.UpdatePrepared(ready));Check(renderer.CompositionCount==14 && pool.Snapshot().BlockReadCount==5);}
+        var shown=hiddenShared.SetVisible(0,true);
+        foreach(var row in new[]{(shown.WithFlip(PsdFlipState.X),yellow),(shown.WithFlip(PsdFlipState.Y),yellow),
+            (shown.WithFlip(PsdFlipState.XY),blue),(shown.WithFlip(PsdFlipState.None),white),
+            (reverse.WithFlip(PsdFlipState.X),red),(shared.WithFlip(PsdFlipState.X),yellow),
+            (remembered.WithFlip(PsdFlipState.Y),green)})
+        {
+            using var ready=PreparedAppearanceLease.Prepare(source,RenderPlan.CreateNotationVisibility(source.Manifest,row.Item1));
+            Check(renderer.UpdatePrepared(ready));Bytes(row.Item2,renderer.Readback());
+        }
+        Check(reverse.RadioSelectionScopes[5]==PsdDirectionScope.Y && hiddenShared.RadioSelectionScopes[5]==(PsdDirectionScope.X|PsdDirectionScope.Y));
+        Check(renderer.CompositionCount==21 && pool.Snapshot().BlockReadCount==5);
+        Check(renderer.LiveGraphObjects==0 && renderer.LiveTemporaryBitmaps==0);
+    });
     Pixels("flat-source-over", [S(0,0,255,128), S(255,0,0)], [127,0,128,255]);
     Pixels("isolated-group-opacity-applied-once", [G(S(0,0,255),S(0,255,0)) with { Opacity = 128 },S(255,0,0)], [127,0,128,255]);
     Pixels("nested-isolated-groups", [G(G(S(0,0,255)),S(0,255,0)),S(255,0,0)], [0,0,255,255]);
@@ -147,13 +441,13 @@ Spec S(byte b,byte g,byte r,byte a=255)=>new(Pixels:[b,g,r,a]);
 Spec Wide(byte b,byte g,byte r,int width)=>new(Pixels:Enumerable.Range(0,width).SelectMany(_=>new byte[]{b,g,r,255}).ToArray(),Bounds:new(0,0,width,1));
 Spec G(params Spec[] children)=>new(Children:children);
 MaskSpec M(byte[] pixels,int x=0,int y=0,byte outside=0,int flags=0)=>new(pixels,new(x,y,pixels.Length,1),outside,flags);
-string Save(Spec[] specs,int width=1)
+string Save(Spec[] specs,int width=1,int height=1)
 {
     var dir=Path.Combine(root,Guid.NewGuid().ToString("N")); using var writer=new CompiledStoreWriter(dir);
     var nodes=new List<LayerNode>(); Add(specs,null);
     var identity=new SourceFingerprint(CompiledFormat.Hash(new byte[26]),26);
     writer.Complete(dir,new CompiledManifest(1,CompiledFormat.CompilerId,CompiledFormat.Generation(identity),identity,
-        1,width,1,8,3,null,null,nodes.ToImmutableArray(),writer.Blocks)); return dir;
+        1,width,height,8,3,null,null,nodes.ToImmutableArray(),writer.Blocks)); return dir;
     void Add(Spec[] siblings,int? parent)
     {
         for(var order=0;order<siblings.Length;order++)
@@ -164,11 +458,11 @@ string Save(Spec[] specs,int width=1)
             MaskInfo? mask=null;
             if(s.Mask is {} m){var mb=writer.AddBlock(BlockFormat.Gray8,m.Bounds.Width,m.Bounds.Height,m.Pixels,compress:false);
                 mask=new(m.Bounds,m.DefaultColor,m.Flags,0,0,m.Feather,0,0,new(0,0,0,0),[new MaskPlane(-2,mb)]);}
-            nodes.Add(new(id,parent,order,group?NodeKind.Group:NodeKind.Layer,"node"+id,bounds,
+            nodes.Add(new(id,parent,order,group?NodeKind.Group:NodeKind.Layer,s.Name??("node"+id),bounds,
                 s.Visible?(byte)0:(byte)2,s.Visible,s.Blend,s.Opacity,s.Clipping,block,mask,[]));
             if(group)Add(s.Children!,id);
         }
     }
 }
-sealed record Spec(byte[]? Pixels=null,PixelRect? Bounds=null,Spec[]? Children=null,string Blend="norm",byte Opacity=255,bool Clipping=false,MaskSpec? Mask=null,bool Visible=true);
+sealed record Spec(byte[]? Pixels=null,PixelRect? Bounds=null,Spec[]? Children=null,string Blend="norm",byte Opacity=255,bool Clipping=false,MaskSpec? Mask=null,bool Visible=true,string? Name=null);
 sealed record MaskSpec(byte[] Pixels,PixelRect Bounds,byte DefaultColor,int Flags,double Feather=0);
