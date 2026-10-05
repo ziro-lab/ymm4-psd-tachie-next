@@ -470,8 +470,7 @@ internal static class PaletteNativeProof
                 activeGate = "host-realized-product-view-" + (png ?? "redisplay");
                 PsdPaletteView? current = null;
                 await Until(() => {
-                    current = Application.Current.Windows.Cast<Window>()
-                        .SelectMany(root => Elements(root).OfType<PsdPaletteView>())
+                    current = ViewRoots().SelectMany(root => Elements(root).OfType<PsdPaletteView>()).Distinct()
                         .FirstOrDefault(view => view.IsLoaded && view.IsVisible && ReferenceEquals(view.DataContext, palette)
                             && view.ActualWidth >= 100 && view.ActualHeight >= 100);
                     return current is not null;
@@ -532,7 +531,9 @@ internal static class PaletteNativeProof
                 assertions, checks, viewProof, failureGate = error is null ? null : activeGate,
                 windowTypes = Application.Current.Windows.Cast<Window>().Select(w => new { type = w.GetType().FullName, vm = w.DataContext?.GetType().FullName, w.IsLoaded, w.IsVisible }).ToArray(),
                 toolState = new { isVisible = Public(Tool(main!, new PsdPalettePlugin().Name), "IsVisible"), visibility = Public(Tool(main!, new PsdPalettePlugin().Name), "Visibility")?.ToString(), isSelected = Public(Tool(main!, new PsdPalettePlugin().Name), "IsSelected"), isActive = Public(Tool(main!, new PsdPalettePlugin().Name), "IsActive") },
-                realizedCandidates = Application.Current.Windows.Cast<Window>().SelectMany(w => Elements(w).OfType<PsdPaletteView>()).Select(v => new { v.IsLoaded, v.IsVisible, v.ActualWidth, v.ActualHeight, currentVm = ReferenceEquals(v.DataContext, palette), vmType = v.DataContext?.GetType().FullName }).ToArray(),
+                presentationRoots = ViewRoots().Select(root => root.GetType().FullName).ToArray(),
+                relatedViewElements = ViewRoots().SelectMany(Elements).OfType<FrameworkElement>().Where(e => ReferenceEquals(e.DataContext, palette) || ReferenceEquals(e.DataContext, Tool(main!, new PsdPalettePlugin().Name)) || e.GetType().Name.Contains("Tool", StringComparison.Ordinal)).Take(32).Select(e => new { type = e.GetType().FullName, vm = e.DataContext?.GetType().FullName, e.IsLoaded, e.IsVisible, e.ActualWidth, e.ActualHeight, contentType = (e as ContentControl)?.Content?.GetType().FullName }).ToArray(),
+                realizedCandidates = ViewRoots().SelectMany(w => Elements(w).OfType<PsdPaletteView>()).Distinct().Select(v => new { v.IsLoaded, v.IsVisible, v.ActualWidth, v.ActualHeight, currentVm = ReferenceEquals(v.DataContext, palette), vmType = v.DataContext?.GetType().FullName }).ToArray(),
                 actualHost = true, actualLiveProject = liveProject,
                 actualHostCreatedProductTool = actualProductTool, actualHostRealizedProductView = viewGatePassed,
                 actualTimelineToolInfoReceipts = receipts, actualToolManager = info?.UndoRedoManager is not null,
@@ -554,6 +555,12 @@ internal static class PaletteNativeProof
         void Check(bool passed, string label) { assertions++; checks.Add(new { label, passed }); if (!passed) throw new InvalidOperationException(label); }
         void Write(string name, object value) => File.WriteAllText(Path.Combine(output, name), System.Text.Json.JsonSerializer.Serialize(value, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
     }
+    // Public WPF presentation roots include HWND-backed surfaces outside Application.Windows.
+    // Enumerating them is observation; no View, Window or input is fabricated.
+    private static IEnumerable<DependencyObject> ViewRoots()
+        => Application.Current.Windows.Cast<Window>().Cast<DependencyObject>()
+            .Concat(PresentationSource.CurrentSources.Cast<PresentationSource>()
+                .Select(source => source.RootVisual).OfType<DependencyObject>()).Distinct();
     private static IEnumerable<DependencyObject> Elements(DependencyObject root)
     {
         var pending = new Stack<DependencyObject>(); pending.Push(root); var visited = 0;
