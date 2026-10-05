@@ -93,6 +93,10 @@ internal static class PaletteNativeProof
         var visible = entry.GetType().GetProperty("IsVisible", BindingFlags.Public | BindingFlags.Instance);
         if (visible?.SetMethod?.IsPublic != true) throw new InvalidOperationException("Public tool visibility route is unavailable.");
         visible.SetValue(entry, true);
+        var layoutVisibility = entry.GetType().GetProperty("Visibility", BindingFlags.Public | BindingFlags.Instance);
+        if (layoutVisibility?.SetMethod?.IsPublic != true || layoutVisibility.PropertyType != typeof(Visibility))
+            throw new InvalidOperationException("Exact public ToolArea WPF visibility route unavailable.");
+        layoutVisibility.SetValue(entry, Visibility.Visible);
         // Docking visibility alone initializes the VM without necessarily realizing its View.
         // Use only the exact container's public activation properties; no input simulation.
         foreach(var name in new[] { "IsSelected", "IsActive" })
@@ -527,6 +531,8 @@ internal static class PaletteNativeProof
                 status = status.StartsWith("PASS_", StringComparison.Ordinal) && viewGatePassed ? "PASS" : "FAIL_OR_BLOCKED",
                 assertions, checks, viewProof, failureGate = error is null ? null : activeGate,
                 windowTypes = Application.Current.Windows.Cast<Window>().Select(w => new { type = w.GetType().FullName, vm = w.DataContext?.GetType().FullName, w.IsLoaded, w.IsVisible }).ToArray(),
+                toolState = new { isVisible = Public(Tool(main!, new PsdPalettePlugin().Name), "IsVisible"), visibility = Public(Tool(main!, new PsdPalettePlugin().Name), "Visibility")?.ToString(), isSelected = Public(Tool(main!, new PsdPalettePlugin().Name), "IsSelected"), isActive = Public(Tool(main!, new PsdPalettePlugin().Name), "IsActive") },
+                realizedCandidates = Application.Current.Windows.Cast<Window>().SelectMany(w => Elements(w).OfType<PsdPaletteView>()).Select(v => new { v.IsLoaded, v.IsVisible, v.ActualWidth, v.ActualHeight, currentVm = ReferenceEquals(v.DataContext, palette), vmType = v.DataContext?.GetType().FullName }).ToArray(),
                 actualHost = true, actualLiveProject = liveProject,
                 actualHostCreatedProductTool = actualProductTool, actualHostRealizedProductView = viewGatePassed,
                 actualTimelineToolInfoReceipts = receipts, actualToolManager = info?.UndoRedoManager is not null,
