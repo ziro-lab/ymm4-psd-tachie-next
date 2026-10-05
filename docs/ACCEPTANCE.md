@@ -158,7 +158,7 @@ Do not close H-A2 with a custom writer, injected token, test cleanup counted as 
 
 Record product/source and checkout SHAs, official host version/hash, SDK, commands, synthetic input identity, writer/range, assertions and artifact identity. Preserve diagnostics on success/failure/timeout/cancel. Separate implementation, pure tests, native integration, physical-device measurements and human visual/audio acceptance.
 
-CI uploads named synthetic JSON/provenance only, retained three days; expired artifacts cannot independently prove results. Do not upload user material, derived cache/manifest/pixels/project/screenshots or host binaries. Authorized local material can support local visual acceptance with a redacted public summary.
+Development regression CI uploads named synthetic JSON/provenance only, retained three days; expired artifacts cannot independently prove results. Do not upload user material, derived cache/manifest/pixels/project/screenshots or host binaries. Authorized local material can support local visual acceptance with a redacted public summary.
 
 Final PASS requires [T01-T12/Q01-Q04](PRODUCT_REQUIREMENTS.md), phase exits, normal editing/player/save/output and distribution first-use. Required unsupported profiles remain failures/pending work, not narrowed requirements. Intent must survive deleting every disposable cache.
 
@@ -172,11 +172,27 @@ their actual CheckBox/Button command bindings, independent eyes/mouth settings,
 standard host Undo/Redo, pane hide/redisplay, native SaveProject/OpenProject and
 post-reopen edits are separate machine gates.
 
-The first two runs were blocked before View realization. The third run found the
-real product View through public WPF PresentationSource roots, but correctly failed
-the probe's incorrect main-Window containment assumption for a floating tool.
-The corrected test uses the actual presentation root carrying the exact host
-ToolArea; full functional execution is pending. A VM-only result cannot pass.
+Native run [37251899727](https://github.com/ziro-lab/ymm4-psd-tachie-next/actions/runs/37251899727)
+is **PASS: 240 assertions, zero failed**, at source/checkout
+`80291417a8288e27546af364449f70b0d46a6f94`, latest-stable Lite **4.56.1.0**,
+.NET SDK **10.0.401**. The actual host supplied TimelineToolInfo and created the
+product View/VM. Public WPF PresentationSource roots expose floating tool content
+outside Application.Windows; the gate verifies its exact host ToolArea and layout.
+Pane redisplay and native project reopen resolve the new current host-created VM.
+A VM-only result cannot pass. Earlier View-discovery/layout/redisplay failures and
+one diagnostic compile failure remain separate retained failures.
+
+The six-member artifact `synthetic-palette-native-ui`, ID `11320254684`, has SHA256
+`848f0307feb5fe6fca07b2b8059f94edeabb114c2825822783fb4927d045bbf4`.
+The ZIP and every result/PNG hash were verified. Four synthetic PNGs show the
+standing target, eyes target, mouth target and reopened mouth target; all four
+were visually inspected. Transparent View pixels are rendered over the live
+logical host Window's opaque brush (or Windows WindowBrush) for a readable PNG;
+this does not change product controls or capture a desktop. Standard host
+Undo/Redo, independent contributor envelopes, native saved JSON, new live item
+identities and post-reopen edit/Undo are asserted. The pending-edit empty-hint
+check is limited to its one measured public flags/history-event condition; it is
+not a general dirty-state or arbitrary history-depth guarantee.
 WPF `RenderTargetBitmap` PNGs and bound `Command.Execute` are not OS mouse/keyboard
 input proof, D3D preview pixel equivalence or human usability acceptance.
 H-A2, physical GPU/audio and Record-throw/post-Capture guarantees remain OPEN.
