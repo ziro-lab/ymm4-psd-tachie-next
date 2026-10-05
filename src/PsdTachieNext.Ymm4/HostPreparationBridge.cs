@@ -2,6 +2,7 @@ using System.Collections;
 using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Threading;
 using PsdTachieNext.Core;
@@ -18,7 +19,7 @@ public sealed class PreparationRefreshStartup : ILocalizePlugin
 }
 
 /// <summary>
-/// UI-owned live item registrations, CPU completion -> equivalent parameter replacement only.
+/// UI-owned live item registrations, CPU completion -> history-free parameter notification only.
 /// Public WPF DataContext and the version-sensitive public Main/Timeline view-model getters are the
 /// bounded host seam. No private fields, player hooks, seeks, worker GPU work or synchronous UI Invoke.
 /// </summary>
@@ -26,6 +27,21 @@ internal static class HostPreparationBridge
 {
     private static readonly object gate = new();
     private static readonly Dictionary<TachieItem, Owner> owners = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<TachieFaceItem, FaceOwner> faceOwners = new(ReferenceEqualityComparer.Instance);
+    private static readonly ConditionalWeakTable<CompiledFaceParameter, object> knownFaceParameters = new();
+    private static long faceOwnershipEpoch;
+    internal static long FaceOwnershipEpoch => Interlocked.Read(ref faceOwnershipEpoch);
+    internal static bool IsFaceInputCurrent(CompiledFaceParameter parameter, int layer)
+    {
+        lock (gate)
+        {
+            // Unregistered default/legacy parameters have no public item-owner contract. A once-owned
+            // native face parameter must still be owned at the supplied layer; old clones cannot fall
+            // back into that unregistered category after a swap or project close.
+            return !knownFaceParameters.TryGetValue(parameter, out _)
+                || faceOwners.Values.Any(owner => owner.Matches(parameter, layer));
+        }
+    }
     private static readonly List<WeakReference<CompiledTachieSource>> sources = [];
     private static object? main, scope, itemsSnapshot;
     private static long scopeEpoch;
@@ -101,6 +117,9 @@ internal static class HostPreparationBridge
     private static TachieItem[] LiveItems(object? snapshot) => (snapshot as IEnumerable)?.Cast<object>()
         .Select(vm => Public(vm, "Item")).OfType<TachieItem>()
         .Where(item => item.TachieItemParameter is CompiledItemParameter).ToArray() ?? [];
+    private static TachieFaceItem[] LiveFaceItems(object? snapshot) => (snapshot as IEnumerable)?.Cast<object>()
+        .Select(vm => Public(vm, "Item")).OfType<TachieFaceItem>()
+        .Where(item => item.TachieFaceParameter is CompiledFaceParameter).ToArray() ?? [];
     private static void RefreshOwners()
     {
         Application.Current.Dispatcher.VerifyAccess();
@@ -109,12 +128,17 @@ internal static class HostPreparationBridge
             var snapshot = Public(scope, "Items");
             if (ReferenceEquals(itemsSnapshot, snapshot)) return; // Immutable host list: no repeated full scan per ready Source.
             var items = LiveItems(snapshot);
+            var faces = LiveFaceItems(snapshot);
             lock (gate)
             {
                 foreach (var item in owners.Keys.Where(item => !items.Contains(item, ReferenceEqualityComparer.Instance)).ToArray())
                 { owners[item].Dispose(); owners.Remove(item); }
                 foreach (var item in items)
                     if (!owners.ContainsKey(item)) owners.Add(item, new Owner(item));
+                foreach (var face in faceOwners.Keys.Where(face => !faces.Contains(face, ReferenceEqualityComparer.Instance)).ToArray())
+                { faceOwners[face].Dispose(); faceOwners.Remove(face); Interlocked.Increment(ref faceOwnershipEpoch); }
+                foreach (var face in faces)
+                    if (!faceOwners.ContainsKey(face)) { faceOwners.Add(face, new FaceOwner(face)); Interlocked.Increment(ref faceOwnershipEpoch); }
                 itemsSnapshot = snapshot;
             }
             // Late initial registration starts a NEW request after the unbound request is ready.
@@ -167,10 +191,11 @@ internal static class HostPreparationBridge
                         && ReferenceEquals(snapshot, Public(scope, "Items")) && live.Contains(owner.Item)
                         && ReferenceEquals(owner.Item.TachieItemParameter, observation.Parameter)
                         && current.CanRefresh(observation, stamp);
-                    if (CompiledParameterRefreshBridge.TryReplaceEquivalent(observation.Parameter,
-                        () => Valid() ? owner.Item.TachieItemParameter : null,
-                        replacement => owner.Item.TachieItemParameter = replacement, out _, Valid)) ReplacementCount++;
-                    else RejectedCount++;
+                    if (!Valid()) { RejectedCount++; continue; }
+                    // A same-value item parameter swap still creates a native pending Undo command.
+                    // Notify through the SDK's protected Bindable API without replacing the owner.
+                    observation.Parameter.NotifyPreparationReady();
+                    ReplacementCount++; // Historical diagnostics name: counts successful refresh hints.
                 }
             }
             catch (Exception e) { LastError = e; } // Notification failures do not fail/consume CPU preparation.
@@ -184,7 +209,12 @@ internal static class HostPreparationBridge
     private static void RetireOwners()
     {
         itemsSnapshot = null;
-        lock (gate) { foreach (var owner in owners.Values) owner.Dispose(); owners.Clear(); }
+        lock (gate)
+        {
+            foreach (var owner in owners.Values) owner.Dispose(); owners.Clear();
+            foreach (var face in faceOwners.Values) face.Dispose(); faceOwners.Clear();
+            Interlocked.Increment(ref faceOwnershipEpoch);
+        }
     }
     private static void Detach()
     {
@@ -194,6 +224,45 @@ internal static class HostPreparationBridge
         RetireOwners(); main = scope = null; Interlocked.Increment(ref scopeEpoch);
         selectedCharacter.Dispose();CompiledTachieSource.StopPrefetch();
         lock (gate) sources.Clear();
+    }
+    // Public live face items, registered on the UI thread. Identity/ABA changes invalidate captured
+    // requests before their CPU-ready candidate can be published, even before the next host Update.
+    private sealed class FaceOwner : IDisposable
+    {
+        private readonly TachieFaceItem item;
+        private volatile CompiledFaceParameter? parameter;
+        internal bool Matches(CompiledFaceParameter expected, int layer)
+            => ReferenceEquals(parameter, expected) && item.Layer == layer;
+        internal FaceOwner(TachieFaceItem item)
+        {
+            this.item = item;
+            ((INotifyPropertyChanged)item).PropertyChanged += Changed;
+            if (item is INotifyPropertyChanging changing) changing.PropertyChanging += Changing;
+            Bind();
+        }
+        private void Changing(object? sender, PropertyChangingEventArgs e) => Interlocked.Increment(ref faceOwnershipEpoch);
+        private void Changed(object? sender, PropertyChangedEventArgs e)
+        {
+            Interlocked.Increment(ref faceOwnershipEpoch);
+            if (ReferenceEquals(sender, item) && (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(TachieFaceItem.TachieFaceParameter))) Bind();
+        }
+        private void Bind()
+        {
+            if (parameter is not null) parameter.PropertyChanged -= Changed;
+            if (parameter is INotifyPropertyChanging old) old.PropertyChanging -= Changing;
+            parameter = item.TachieFaceParameter as CompiledFaceParameter;
+            if (parameter is not null) knownFaceParameters.GetValue(parameter, _ => new object());
+            if (parameter is not null) parameter.PropertyChanged += Changed;
+            if (parameter is INotifyPropertyChanging current) current.PropertyChanging += Changing;
+        }
+        public void Dispose()
+        {
+            ((INotifyPropertyChanged)item).PropertyChanged -= Changed;
+            if (item is INotifyPropertyChanging changing) changing.PropertyChanging -= Changing;
+            if (parameter is not null) parameter.PropertyChanged -= Changed;
+            if (parameter is INotifyPropertyChanging old) old.PropertyChanging -= Changing;
+            parameter = null;
+        }
     }
     internal sealed class Owner : IDisposable
     {
@@ -213,10 +282,16 @@ internal static class HostPreparationBridge
         private void Changed(object? sender, PropertyChangedEventArgs e)
         {
             // Parameter swap and other item changes invalidate queued completion, including an Undo ABA.
+            if (e.PropertyName == nameof(TachieItem.TachieItemParameter)
+                && ReferenceEquals(Item.TachieItemParameter, Parameter) && Parameter?.IsPreparationNotification == true) return;
             Lifetime.Invalidate();
             if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == nameof(TachieItem.TachieItemParameter)) Bind();
         }
-        private void ParameterChanged(object? sender, PropertyChangedEventArgs e) => Lifetime.Invalidate();
+        private void ParameterChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(CompiledItemParameter.Appearance) && Parameter?.IsPreparationNotification == true) return;
+            Lifetime.Invalidate();
+        }
         public void Dispose()
         {
             Lifetime.Dispose(); ((INotifyPropertyChanged)Item).PropertyChanged -= Changed;

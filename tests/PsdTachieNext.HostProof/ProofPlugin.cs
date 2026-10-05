@@ -32,6 +32,7 @@ public sealed class ProofPlugin : ILocalizePlugin
     public string Name => "PSD Tachie Next private integration proof";
     public void SetCulture(CultureInfo cultureInfo)
     {
+        if (SparseNativeProof.Schedule()) return;
         if (LiveRefreshProof.Schedule()) return;
         var output = Environment.GetEnvironmentVariable("PSD_NEXT_HOST_PROOF_OUTPUT");
         if (string.IsNullOrWhiteSpace(output) || Interlocked.Exchange(ref started, 1) != 0) return;

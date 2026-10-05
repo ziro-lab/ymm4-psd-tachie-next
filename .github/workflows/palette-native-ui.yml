@@ -1,0 +1,117 @@
+name: Synthetic palette real-host UI proof
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/palette-native-ui.yml'
+      - 'eng/run_palette_native_ui.ps1'
+      - 'tests/PsdTachieNext.PaletteUiProof/**'
+      - 'src/PsdTachieNext.Ymm4/PsdPalette*.cs'
+      - 'tests/PsdTachieNext.ParameterTests/**'
+      - 'tests/PsdTachieNext.Tests/PsdFixture.cs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: palette-native-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+  DOTNET_NOLOGO: '1'
+  SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  palette-native:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      HOST_VERSION: '4.56.1.0'
+      HOST_ZIP_SHA256: '49c0ed689f545737b7ce939971bfc625962e00791c57883dc8e6f058aa336c5a'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.401'
+      - name: Prepare reviewed MIT parser
+        shell: pwsh
+        run: |
+          python eng/prepare_parser.py
+          if ($LASTEXITCODE -ne 0) { throw 'Parser preparation failed.' }
+      - name: Verify latest stable and acquire one temporary runner host
+        shell: pwsh
+        run: |
+          $latest = Invoke-RestMethod https://api.github.com/repos/manju-summoner/YukkuriMovieMaker4/releases/latest
+          if ($latest.tag_name -ne "v$env:HOST_VERSION" -or $latest.draft -or $latest.prerelease) { throw 'Stable host changed: repin/revalidate required.' }
+          $asset = $latest.assets | Where-Object name -eq "YukkuriMovieMaker_v$($env:HOST_VERSION)_Lite.zip"
+          if (-not $asset -or $asset.digest -ne "sha256:$env:HOST_ZIP_SHA256") { throw 'Official asset identity mismatch.' }
+          $root = Join-Path $env:RUNNER_TEMP 'psd-palette-single-host'
+          New-Item -ItemType Directory -Path $root | Out-Null
+          $zip = Join-Path $root 'host.zip'
+          curl.exe -L --fail --retry 2 --silent --show-error -o $zip $asset.browser_download_url
+          if ($LASTEXITCODE -ne 0) { throw 'Official host download failed.' }
+          if ((Get-FileHash $zip).Hash.ToLowerInvariant() -ne $env:HOST_ZIP_SHA256) { throw 'Host archive hash mismatch.' }
+          Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $root 'host')
+          $executables = @(Get-ChildItem (Join-Path $root 'host') -Recurse -Filter YukkuriMovieMaker.exe)
+          if ($executables.Count -ne 1) { throw 'Unexpected official archive layout.' }
+          $exe = $executables[0]
+          if ($exe.VersionInfo.FileVersion -ne $env:HOST_VERSION) { throw 'Host executable version mismatch.' }
+          "YMM4_DIR=$($exe.Directory.FullName)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          New-Item -ItemType Directory -Force out/palette-evidence | Out-Null
+          [ordered]@{version=$env:HOST_VERSION;archiveSha256=$env:HOST_ZIP_SHA256;executableSha256=(Get-FileHash $exe.FullName).Hash.ToLowerInvariant();officialRelease=$latest.html_url} | ConvertTo-Json | Set-Content out/palette-evidence/host-identity.json
+      - name: Build separate synthetic driver
+        shell: pwsh
+        run: |
+          dotnet build tests/PsdTachieNext.PaletteUiProof -c Release "-p:YMM4DirPath=$env:YMM4_DIR" -o out/palette-driver --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Palette driver build failed.' }
+      - name: Run managed hierarchy and parameter regressions against the same host
+        shell: pwsh
+        run: |
+          dotnet build tests/PsdTachieNext.ParameterTests -c Release "-p:YMM4DirPath=$env:YMM4_DIR" -o out/palette-managed --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Managed palette regression build failed.' }
+          dotnet out/palette-managed/PsdTachieNext.ParameterTests.dll $env:YMM4_DIR (Join-Path $PWD 'out/palette-evidence/parameter-results.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Managed palette regressions failed.' }
+      - name: Validate hierarchical palette, folding, independent parts, native history and reopen
+        shell: pwsh
+        run: |
+          ./eng/run_palette_native_ui.ps1 -Ymm4Dir $env:YMM4_DIR -DriverDir (Join-Path $PWD 'out/palette-driver') -EvidenceDir (Join-Path $PWD 'out/palette-evidence') -Scenario hierarchy
+      - name: Record allowlisted provenance
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out/palette-evidence | Out-Null
+          $root=Join-Path $PWD 'out/palette-evidence'
+          $hashes=[ordered]@{}
+          foreach($name in @('palette-results.json','palette-hierarchy-results.json','target.png','eyes.png','mouth.png','reopened.png','hierarchy-expanded.png','hierarchy-folded.png')){
+            $path=Join-Path $root $name
+            if(Test-Path -LiteralPath $path){$hashes[$name]=(Get-FileHash $path).Hash.ToLowerInvariant()}
+          }
+          $hostIdentity=if(Test-Path out/palette-evidence/host-identity.json){Get-Content -Raw out/palette-evidence/host-identity.json | ConvertFrom-Json}else{$null}
+          $dlls=[ordered]@{}
+          foreach($name in @('PsdTachieNext.Ymm4.dll','PsdTachieNext.Core.dll','PsdTachieNext.Compiler.dll','PsdTachieNext.Parser.dll','PsdTachieNext.HostProof.dll')){
+            $path=Join-Path 'out/palette-driver' $name
+            if(Test-Path $path){$dlls[$name]=(Get-FileHash $path).Hash.ToLowerInvariant()}
+          }
+          [ordered]@{schema='psd-next.palette-provenance.v1';sourceHead=$env:SOURCE_HEAD;checkoutSha=(git rev-parse HEAD);checkoutTree=(git rev-parse 'HEAD^{tree}');runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT;sdk=(dotnet --version);host=$hostIdentity;assemblySha256=$dlls;filesSha256=$hashes;syntheticOnly=$true;physicalInputVerified=$false;humanAcceptance=$false} | ConvertTo-Json -Depth 7 | Set-Content (Join-Path $root 'provenance.json')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: synthetic-palette-native-ui
+          path: |
+            out/palette-evidence/provenance.json
+            out/palette-evidence/palette-results.json
+            out/palette-evidence/palette-hierarchy-results.json
+            out/palette-evidence/target.png
+            out/palette-evidence/eyes.png
+            out/palette-evidence/mouth.png
+            out/palette-evidence/reopened.png
+            out/palette-evidence/hierarchy-expanded.png
+            out/palette-evidence/hierarchy-folded.png
+          retention-days: 7
+          if-no-files-found: warn

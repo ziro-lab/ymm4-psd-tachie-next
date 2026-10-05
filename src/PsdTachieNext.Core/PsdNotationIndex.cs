@@ -32,9 +32,11 @@ public sealed class PsdNotationIndex
 {
     private readonly ImmutableDictionary<int, ImmutableArray<int>> children;
     private readonly ImmutableDictionary<(int Parent, string Name), ImmutableArray<int>> names;
+    private readonly Lazy<PsdFlipBindingIndex> flipBindings;
     public string GenerationId { get; }
     public string SourceSha256 { get; }
     public ImmutableArray<PsdNotationNode> Nodes { get; }
+    public PsdFlipBindingIndex FlipBindings => flipBindings.Value;
 
     // Only the shared pool supplies a validated manifest.
     internal PsdNotationIndex(CompiledManifest manifest)
@@ -57,6 +59,7 @@ public sealed class PsdNotationIndex
         Nodes = nodes.MoveToImmutable();
         children = byParent.ToImmutableDictionary(p => p.Key, p => p.Value.ToImmutableArray());
         names = byName.ToImmutableDictionary(p => p.Key, p => p.Value.ToImmutableArray());
+        flipBindings = new(() => new PsdFlipBindingIndex(this));
     }
 
     /// <summary>Original sibling order; null denotes the root. Negative parent IDs are invalid.</summary>

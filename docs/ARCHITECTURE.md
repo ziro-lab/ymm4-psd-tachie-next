@@ -1,5 +1,23 @@
 # Current architecture and decisions
 
+Current status note (2026-10-05): PR4 adds sparse base/item/ordered-face composition
+and bounded flat native palette/Undo/save evidence. Historical OPEN statements below
+do not override that scoped evidence. The local hierarchy increment projects one row
+per raw-ID logical origin; counterpart groups/children share the logical parent.
+A virtualized flat list displays that tree with structural indent and group disclosure.
+Folded origins remain only in the palette VM for the current loaded generation;
+target refresh/edit retains them while source release/suspend clears them. Folding
+rebuilds row epochs, rejects stale commands and changes no parameter, native history
+or saved JSON. It adds no document parser, thumbnail/cache or custom Undo stack.
+Simple/settings palettes, presets, animation and full native hierarchy evidence
+remain unfinished.
+
+The current local [sparse persistence checkpoint](SPARSE_APPEARANCE.md) adds immutable authored
+appearance JSON to the existing item owner, validated PSD layer-ID references and worker-side
+preparation resolution. It supersedes earlier statements below that no persisted appearance
+parameter exists. Base/preset/item stacking, native Undo/save/copy/split and full product T08
+remain open; the internal complete-state checkpoint is not the product save schema.
+
 Baseline: public source [73cc24e](https://github.com/ziro-lab/ymm4-psd-tachie-next/commit/73cc24e7eb70a319f15f8191aa31081638ccc3e9). This document distinguishes existing mechanisms from later proposals.
 
 ## Dependency direction
@@ -33,6 +51,13 @@ The adapter uses public Plugin/graphics interfaces plus a narrow public host/WPF
 
 ## Planned appearance model
 
+The local [pure visibility checkpoint](VISIBILITY_CHECKPOINT.md) reconstructs logical alias
+choices, direction masks, orientation and reference metadata atomically. It is an internal
+experimental test seam; sparse saved parameter semantics and native integration remain OPEN.
+Across-generation unique-hierarchy recovery requires explicit opt-in and is not an adopted
+automatic relink policy. Preserve the document's schema/reference decision gate before wiring
+product save or Undo.
+
 Phase C adds a durable PersistentLayerRef using original hierarchy, node kind, duplicate disambiguation and available PSD IDs/structural evidence. Current `LayerRef(SourceSha256, NodeId, OriginalName)` is generation-local and correctly rejects changed content; it is not yet safe persistence across arbitrary source edits.
 
 First derive a document-generation notation index from preserved original names rather than changing compiled format unnecessarily. Phase D resolves base + immutable preset + item-local sparse patch + ordered expression contributions per target. Resolve Override before PSDTool constraints and current eye/mouth evaluation. Include all result-affecting inputs in the appearance/render identity; unchanged identity must not force recomposition.
@@ -41,7 +66,33 @@ The local phase-C candidate adds `SharedDocumentLease.Notation`: one lazy, immut
 
 Lexical rules follow the [PSDTool manual](https://oov.github.io/psdtool/manual.html) and the author's [`layertree.ts` at `5f40b67`](https://github.com/oov/PSDTool/blob/5f40b67da531db5e689831aba71bd438d5ee0ae0/src/layertree.ts). Only the first ASCII prefix marker is classified; the reference's exact `!?` exception is preserved. Consecutive recognized colon suffixes identify separate X, Y and XY flip states; X plus Y is not XY. The flip base retains any original prefix. Bare markers, empty flip bases and reference token-only parser edges retain the original display label and expose diagnostics. Unknown suffix text remains literal. This is an independent implementation of notation metadata, not copied reference code.
 
-No visibility evaluator, radio default selection, flip-pair/child mapping, duplicate-name auto-resolution, persistent reference/schema, PFV path escaping/import, palette, Undo or saved-setting change is included. Those remain phase-C/D work; diagnostic names require an explicit interpretation before behavior is assigned. Retaining the index after lease release retains only immutable metadata; disposing a lease clears its index reference.
+The published notation index at `808a5fb` is metadata only. Retaining the index after lease release retains only immutable metadata; disposing a lease clears its index reference.
+
+The preceding local checkpoint added an independently implemented prefix-only `PsdPrefixVisibility`. It keeps immutable local checkbox choices separately from effective ancestor/opacity/clipping visibility. Radio siblings share their immediate parent, regardless of duplicate names or node kind; initialization selects the topmost saved-visible radio, or the topmost radio when none is saved visible. A radio switch produces one new state and cannot deselect the chosen radio. Force-visible nodes are locally enabled even when saved hidden and cannot be deselected through this operation. Hiding a parent preserves its children's choices. Bare markers and the exact `!?` exception remain ordinary literal names.
+
+`RenderPlan.CreatePrefixVisibility` checks the compiled generation/source identity, then evaluates the enabled local choices through the existing ancestor/opacity/clipping rules. `PreparedAssetLease.PreparePrefixAppearance` remains the prefix-only preparation seam. The current original-source preparation and selected-source prefetch instead use `PrepareNotationAppearance` with the same default `PsdVisibilityState`. Raw explicit-node preparation/renderer seams remain diagnostics. A hidden-child-only edit shares the same effective appearance key and does not recompose; showing the parent later uses the retained choice.
+
+The explicit prefix-only seam still rejects any recognized flip suffix or unresolved token-only parser edge anywhere in the document. The full notation profile admits recognized flips; unresolved token-only names and empty flip bases remain unsupported, including hidden nodes. Admission occurs before acquisition/decoding of compiled pixel blocks; the initial original-source compilation has already parsed and converted PSD pixels. `UnsupportedPsdNotationException` and `PsdFlipBindingException` map to `PreparationRecovery.UnsupportedNotation` with notation-specific guidance. They do not suggest changing a valid RGB8 material's pixel format. Generic source/drawing `NotSupportedException` retains its existing diagnostic category.
+
+`PsdNotationIndex.FlipBindings` is one lazy immutable binding index per notation generation. Registration follows the fixed reference's child-before-parent order. A counterpart binds only to an exact raw original name under the same immediate parent, retaining prefixes. Child mapping follows original names and bottom-based duplicate occurrence identity recursively; equal duplicate counts and matching kinds are required in this checkpoint. Names, order, IDs and duplicate identities are never rewritten, escaped into reference keys or collapsed into display labels.
+
+`PsdVisibilityState` stores immutable common and direction-only selection-origin choices, plus immutable `RadioSelectionScopes` for selected direction subsets of each radio origin. None/X/Y/XY evaluate independently of seek history. Prefix defaults and saved-visible counterparts normalize to None exactly once; the radio baseline fallback counts selected common aliases before adding an origin. Each raw counterpart follows exact binding edges to a unique terminal origin; editing accepts that origin and rejects aliases. Common edits clear obsolete alias flags for the explicitly selected part. The original ordinary P2 case and the later radio P2 initial `[0,2,4]` checked / `[0,2]` effective result remain protected. These values are owner-local; shared documents carry no mutable choice state.
+
+Initial None normalization runs exactly once; normalized None choices are consumed directly rather than re-evaluated by object construction, edits or pure None restoration. Missing nested matches can make the reference's flip-off pass non-idempotent. A focused case with a saved-visible outer counterpart and a missing inner base yields both normal children after one pass; a second pass incorrectly erases one child. Fresh initialization followed by one X/Y/XY setter matches the pinned reference. Repeated reference setters can change that result: for this case X-to-None restores both children, whereas Y/XY-to-None retains only the normal child. On 2026-10-04 the user adopted returning to current logical normal-side choices, intentionally differing from that sequential side effect. This does not mean restoring the obsolete state captured before the flip. `SetVisible` updates canonical choices in every orientation, and `WithFlip(None)` retains those newer changes. Full source-notation/drawing compatibility remains a separate open requirement.
+
+The editing seam accepts explicit selection-origin IDs; a future palette must retain them when presenting evaluated counterparts. Callers replace the current immutable state with each returned value, then invoke `WithFlip(None)` on that updated state. A pre-flip snapshot is retained only for explicit undo. Same-generation owner snapshots restore choices and orientation without modifying other snapshots or shared notation; another generation rejects explicitly. This proves pure snapshot consistency, not native Undo, save/reopen, durable references or a saved full-visibility schema.
+
+The direction-only model supports unmatched children and missing-base roots using structural scopes. The shared immutable `PsdFlipSelectionIndex` exposes terminal raw-ID origins and aliases, per-slot `PhysicalScopes`, their union as each origin's `SelectionScopes`, and `DirectionOnlyScopes` for origins without None. Dependency and ancestor traversals preserve IDs and exact binding evidence. Shared X/Y is distinct from XY. Effective evaluation masks inactive choices without erasing remembered intent; hidden ancestors only affect the RenderPlan. No parsing, pixel read/decode, lock-held I/O or renderer fallback is added. Radio ownership checks aggregate sibling groups for three directions without expanding all pairs; the 512-radio regression remains.
+
+An active direction-only radio outranks common-child transfer. The user adopted last explicit selection within its valid directions: selecting a radio fills that origin's available scope and subtracts only actual competing physical sibling-slot intersections from other origins' selected scopes. Selecting X/Y-shared B after X-only A replaces A in X and selects B in Y; selecting A later removes only B's X selection and preserves its Y selection. Selecting a fully common part updates all applicable directions, while a common part lacking an X alias preserves the X-only choice. Raw alias flags of partially retained peers remain intact outside the overlap, including the radio P2 None selection. Re-selecting a part with a partial scope expands it again even when its raw checkbox is already true. `IsLocallyVisible` reports retained raw checkbox memory; the immutable radio scope map governs its applicability. `WithFlip` and ordinary parent hiding reuse that map unchanged. Force/radio false operations remain no-ops. Initialization counts selected common origin or alias once; it adds no automatic first-Y choice for an all-direction-only group.
+
+The earlier mixed-direction operation guard is removed after the explicit B-priority decision; `PsdDirectionEditException` is no longer part of this unpublished candidate. Radio subset masks are needed to retain B in Y after a later X-only A selection. Masks stay within exact origin availability and structural sibling intersections, and same-generation snapshots restore them immutably. There is no history mutation during orientation changes, no cross-domain name matching, no new persisted parameter and no native Undo stack. The separate first-Y empty initialization policy remains unadopted and unchanged.
+
+Missing bases and unmatched children keep structured `MissingBase`/`MissingChild` metadata and use the adopted direction-only choice rules above. No warning UI is claimed. Ambiguous base names, overlapping variants, kind mismatches and unequal duplicate counts still block preparation. New blocking diagnostics preserve IDs for multiple terminal selection origins, ownership cycles, an origin with no possible structural direction, and direction-only radio owners from different original parents merging into one physical group. One blocking issue rejects the whole document, including hidden nodes, before compiled-block reads; initial original-source compilation has already parsed and converted PSD pixels. These conservative restrictions do not implement ambiguity repair or establish full reference compatibility.
+
+The renderer composes the selected graph first and then mirrors the whole canvas, following the fixed [`renderer.ts`](https://github.com/oov/PSDTool/blob/5f40b67da531db5e689831aba71bd438d5ee0ae0/src/renderer.ts). Flip state participates in the appearance key even when selected node IDs are identical. Required-block preparation and resource limits remain in the existing CPU preparation path; graph work remains render-thread work with context restoration. Pure evaluation and synthetic WARP pixels cover this checkpoint; no native switching control, physical-GPU performance or full PSD drawing compatibility is claimed.
+
+Durable references and source-edit repair, sparse serialization, PFV interchange, palettes and native Undo remain OPEN. No new saved settings or user-visible switching UI is added. Generation-local checkbox state is not a sparse expression patch and must not be persisted as one. These limits preserve the full phase-C/D requirements; T08 remains OPEN.
 
 Phase E requires timeline contribution snapshots/indexes for past-ended expressions and direct/reverse seek. EX1 is a proposal, not a shipped rule set. Phase F uses host time/voice inputs and small repeated eye/mouth block sets. Phase G's palettes share source/document preparation with separate finite thumbnail ownership. Native Undo and project settings remain the only user-facing history/authority.
 

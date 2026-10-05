@@ -1,6 +1,9 @@
 # Acceptance and current evidence
 
-Status date: 2026-10-03. Public baseline: `73cc24e7eb70a319f15f8191aa31081638ccc3e9`. Historical host observations used official YMM4 Lite **4.56.1.0**, SDK **10.0.401**. New tests reconfirm the official latest stable host, not indefinitely inherit this pin.
+Latest source-only review checkpoint (2026-10-04, base808a5fb): [scope, evidence and open gates](PALETTE_CHECKPOINT.md). Local native83 and WPF-component11 are narrowly scoped; historical rows/checklists below are retained and do not become whole-feature PASS.
+
+
+Historical baseline status date: 2026-10-03. Public baseline: `73cc24e7eb70a319f15f8191aa31081638ccc3e9`. Historical host observations used official YMM4 Lite **4.56.1.0**, SDK **10.0.401**. New tests reconfirm the official latest stable host, not indefinitely inherit this pin.
 
 ## Evidence layers
 
@@ -66,13 +69,79 @@ Representative named fixtures in [preparation tests](../tests/PsdTachieNext.Prep
 
 Fixture names describe scoped assertions, not completion of every corresponding native gate. Renderer suites supply A23/A24 pixel/candidate cases; native A25-A29 need their separate evidence above.
 
-## Phase-C read-only notation candidate
+## Phase-C notation, prefix and flip visibility checkpoints
 
-Local uncommitted source adds a shared, generation-local notation index. Synthetic runtime cases cover the pinned PSDTool prefix/suffix matrix, unresolved-name diagnostics, hierarchy and duplicate IDs, literal special characters, rejection of negative parent IDs instead of aliasing the root, concurrent/identical-copy sharing, source-generation separation, metadata release after disposal, and deep trees without recursive path construction. Existing preparation/core/runtime suites remain the regression boundary. Run identity and counts belong to the separate local candidate report; this is not a new CI or native-host result.
+Published source `808a5fb` adds the shared, generation-local notation index. Synthetic runtime cases cover the pinned PSDTool prefix/suffix matrix, unresolved-name diagnostics, hierarchy and duplicate IDs, literal special characters, rejection of negative parent IDs instead of aliasing the root, concurrent/identical-copy sharing, source-generation separation, metadata release after disposal, and deep trees without recursive path construction.
 
-T08 and phase C remain OPEN: visibility constraints, radio selection/defaults, flip pairing, durable references, serialization/escaping and native Undo are not exercised or implemented by this metadata candidate. H-A2 remains OPEN.
+The preceding local uncommitted checkpoint connected immutable prefix visibility to prepared RenderPlans and the original-source/prefetch paths. Five focused runtime cases cover default radio selection within each immediate parent, duplicate names, independent ordinary overlap, forced local visibility, retained hidden-parent choices, required-block admission, clipping/zero opacity, generation mismatch/invalid IDs, and explicit flip/token-edge rejection before compiled-block reads. Three original-source preparation cases initially covered switched pixel blocks without recompilation, consistent prefetch/actual-use defaults, failure cleanup and the retained raw diagnostic seam. The initial prefix checkpoint's local CPU suites passed core 34 cases/196 assertions, runtime 24/241 and preparation 57/306: **115 cases / 743 assertions**. Build warnings/errors were zero. The first runtime build failed on test-only target typing of a single `params` argument; the explicit test type was corrected and runtime was rerun successfully. These are local Windows CPU results, not a new Actions or native-host result.
+
+One tree WARP regression connects the state to actual prepared pixels: hidden-parent switching leaves the effective output/composition count unchanged, showing the parent renders the retained choice, and an exclusive switch changes green to red without leaking transient graph objects. The local host-bound tree suite passes **42 cases / 272 assertions, pixel tolerance 0** against the version/hash-verified official latest stable 4.56.1.0 references. The harness uses the same tracked renderer/cases, the existing host signed-pitch/AlphaMode compatibility source, and only adapts WARP device creation to the public host out-device overload with a null guard. Its first two builds failed on omitted compatibility bindings and nullable handling; both records are retained, and the corrected run passes with zero warnings/errors. Plugin, host-driver and CLI builds also pass with zero warnings/errors. This is a private local harness, not the pinned NuGet 3.8.3 Actions lane; YMM4 was not launched and no host payload was installed. Required new source CI and native editing/save/output gates remain OPEN.
+
+The reviewed diagnostic follow-up separates `UnsupportedPsdNotationException` and `PreparationRecovery.UnsupportedNotation` from generic unsupported pixel/drawing profiles. Runtime cases cover visible and hidden flip/token-only names, combined reasons and notation-specific message/action without RGB8 replacement advice. An original-PSD session case checks that a saved-hidden offending node fails the entire request, publishes no ready appearance, performs no unstable-source retry, releases the shared document/decoded blocks and exposes the correct user-facing diagnostic. The original-source compiler has already converted the initial PSD pixels when this profile rejects it: "before decoding" here means only compiled-block acquisition/decoding. The corrected CPU suites pass core **34/196**, runtime **24/310** and preparation **58/330**: **116 cases / 836 assertions**, zero failures and build warnings/errors. The corrected source also passes host-bound WARP **42/272** and Plugin/HostProof/CLI builds with zero warnings/errors. Updated run identities are recorded separately from the initial checkpoint above; the local harness, required Actions and native-host distinctions remain unchanged.
+
+The next protected local candidate adds pure None/X/Y/XY evaluation and immutable original-name flip bindings against PSDTool commit `5f40b67da531db5e689831aba71bd438d5ee0ae0`. Six focused runtime cases cover independent flip states, saved-visible prefix normalization, duplicate child IDs, exact raw child names, hidden-parent retention, recursive child-before-parent flip order, missing candidates/children and blocking ambiguities. Missing bases and unmatched children retain reference-defined choices with diagnostics; ambiguous base names, overlapping variants, kind differences and unequal duplicate counts stop preparation without guessed correspondence. Two original-source preparation cases cover switched counterpart blocks without recompilation and diagnostic-preserving prefetch of an unmatched hidden variant. The full-profile token-only rejection retains notation-specific guidance; the legacy prefix-only seam continues to reject flips explicitly.
+
+The preceding flip checkpoint's local CPU suites passed core **34/196**, runtime **30/410** and preparation **60/339**: **124 cases / 945 assertions**, zero failures and build warnings/errors. Three additional synthetic WARP cases verify exact whole-canvas None/X/Y/XY pixels, shared X/Y suffix versus separate XY selection, flip identity/context restoration, and duplicate-radio child transfer under a hidden parent. The host-bound tree suite passed **45 cases / 315 assertions, tolerance 0**; Plugin/HostProof/CLI builds passed with zero warnings/errors against verified official stable 4.56.1.0 references. The first new WARP build failed on test-only object-initializer syntax; that record is retained and the corrected fresh run passes. This is the same private host-reference harness distinction described above, not the pinned NuGet 3.8.3 Actions lane. YMM4 was not launched and no payload was installed.
+
+Independent review found a missing-base/nested-flip initialization counterexample absent from the preceding successful suites. Before correction the new runtime fixture failed: the second None evaluation lost a visible child. Executing the pinned reference's flip registration/transfer/setter methods with ordinary-node stubs confirms active IDs `[0,1,2]` after one initialization pass, while the old candidate produced `[0,1]`. The correction normalizes saved variants once and directly consumes normalized None choices. Added runtime and exact WARP cases cover this initial result, direct X/Y/XY evaluation and pure None restoration. Fresh initialization plus one reference setter yields X `[3,4]`, Y/XY `[0,1]`; X-to-None yields `[0,1,2]`, Y/XY-to-None yields `[0,1]`. The pure checkpoint restores current canonical None `[0,1,2]` when no edit has occurred. Repeated reference setters are non-idempotent for this accepted missing-binding input. On 2026-10-04 the user adopted stable current-selection return as an intentional compatibility difference; the later adopted direction-only model and remaining mixed-scope guard are described below.
+
+Corrected local CPU suites pass core **34/196**, runtime **31/427**, preparation **60/339**: **125 cases / 962 assertions**. Corrected host-reference WARP passes **46 cases / 331 assertions, tolerance 0**. Plugin/HostProof/CLI builds also pass with zero compiler warnings/errors. The failing pre-fix counterexample and previous successful suites remain retained; only these corrected run identities include the new counterexample. The private host-reference versus Actions/native-host distinctions remain unchanged.
+
+Four new runtime cases cover edits in every orientation, latest-choice return, independent ordinary overlap, duplicate radios, same-generation idempotence, shared X/Y and separate XY, hidden-parent retention, immutable owner snapshot undo/redo and foreign-generation rejection. A characterization case confirms the retained-but-None-hidden unmatched ordinary choice, the unmatched radio overwritten by matched-child transfer, and the P2 case's independently retained bound counterpart after editing its normal node off. These are explicit limitations of a raw diagnostic seam, not accepted end-user behavior. Runtime result counts are recorded separately after this added characterization. Core **34/196** and preparation **60/339** retain their preceding results because their behavior is unchanged; the new production edit is API documentation only. The evidence inventory combines these retained results with the current runtime result, not a fresh full-CPU run. New host-reference WARP coverage verifies edited and restored snapshot pixels for X/Y/XY and latest normal-side return: **47 cases / 372 assertions, tolerance 0**; Plugin/HostProof/CLI builds pass with zero warnings/errors.
+
+The latest local candidate implements the subsequently adopted direction-only selection policy. Seven focused runtime cases cover missing-base roots and unmatched children; None/X/Y/XY scope masks; shared X/Y versus separate XY; force/radio rules; common transfer with retained direction overrides; common edits and alias cleanup; hidden parents; nested internal bindings; immutable snapshot consistency; a 512-radio index; and structured rejection of ambiguous ownership or impossible scopes. Prior unmatched-radio overwrite and P2 stale-alias characterization are now regressions for the corrected behavior. An original-source preparation case checks required-block selection, force visibility and flip round trips without recompilation or input changes. Two exact WARP cases verify direction masks, hidden-parent restoration, radio/common edits and snapshot pixels with expected composition/read counts and zero transient graph leaks.
+
+Fresh full CPU validation passes core **34 cases/196 assertions**, runtime **42/613** and preparation **61/352**: **137 cases / 1161 assertions**, zero failures. Fresh host-reference WARP passes **49 cases / 431 assertions, pixel tolerance 0**; Plugin/HostProof/CLI builds pass with zero compiler warnings/errors. These counts come from new full executions, not retained-suite inventory. A new mixed-scope guard initially rejected a safe Y-only common-radio edit; that one-failure run remains retained. The guard was narrowed to multi-scope conflicts and all CPU/WARP suites were rerun in distinct successful runs. Prior candidates and evidence remain protected.
+
+Official latest stable was checked anew before validation: **4.56.1.0**, executable SHA256 `3a2beb9890f0c3c88a4b0d17c2d8a6a5f1f974ce1d411a58e2769f9c8b473e9a`, SDK **10.0.401**. The same tracked tests/renderer and existing host compatibility shim run against the private host references; only public WARP out-device creation is adapted. This is not the pinned NuGet 3.8.3 Actions lane or actual YMM4 execution. No host launch, payload deployment, native Undo, save/reopen, normal writer, physical-GPU performance or source-edit persistence is proved by these results.
+
+At the preceding direction checkpoint, partially overlapping radio edits were guarded pending an explicit policy decision. That guard is superseded by the adopted priority follow-up below. Durable references/source-edit repair, sparse saved settings/PFV, palette/native exclusive-switch Undo and full T08/C compatibility remain OPEN. Source-level ambiguous ownership and unresolved token-only/empty flip bases remain checkpoint restrictions, including hidden nodes; missing-binding diagnostics are metadata without warning UI. No persisted parameter or end-user selection control is added. Required Actions/native editing/save/output evidence and H-A2 remain OPEN.
+
+## Direction radio initial fallback review follow-up
+
+Independent review found a further radio P2 counterexample absent from the preceding 137/1161 CPU and 49/431 WARP suites: hidden `body` with hidden `*part` and visible `*part:flipx`, plus visible `body:flipx` with visible `*part:flipx`. One reference None pass selects `[0,2,4]`, but the direction candidate's common baseline fallback ignored selected common alias 2 and added origin 1. The failing execution records checked `[0,1,2,4]`, effective `[0,1,2]`, and **43/44 runtime cases, 625 assertions, one failure**. The original direction candidate and failure evidence are retained.
+
+The minimal correction counts selected common aliases in the existing sibling group before adding a common baseline. It does not rerun None normalization or add direction-only fallback. Initial checked IDs are now `[0,2,4]`, effective IDs `[0,2]`. Two new runtime cases cover exact initial exclusivity, None/X/Y/XY round trips, immutable snapshot preservation and common edits, plus the unchanged empty first-Y result for a group containing only saved-selected X-only A and unselected Y-only B. One WARP case verifies separate-position pixels through every return to None, an edited common choice and restored snapshot, with nine compositions, three block reads and zero transient graph objects.
+
+Fresh full CPU passes core **34/196**, runtime **44/659** and preparation **61/352**: **139 cases / 1207 assertions**, zero failures. Fresh private host-reference WARP passes **50 cases / 459 assertions, tolerance 0**; Plugin/HostProof/CLI and test builds pass with zero compiler warnings/errors. Official latest stable was checked again before testing: **4.56.1.0**, with the same verified executable hash and SDK **10.0.401**. This is local unpublished source validation, not the required NuGet 3.8.3 Actions lane, native host launch, Undo, save/reopen or output proof.
+
+At the radio P2 checkpoint, mixed X-only A versus X/Y-shared B priority remained OPEN and conflicting edits were guarded. The subsequently adopted B-priority rule is implemented and verified below. The separate first-Y empty-selection initialization policy remains unadopted and unchanged. Native/persistence/ambiguity-repair and full phase-C/T08 gates remain OPEN.
+
+## Adopted radio selection priority follow-up
+
+The user answered B for X-only A selected in X followed by X/Y-shared B selected in Y. Explicit radio edits now win in the selected part's valid structural directions; changing orientation alone preserves memory. A later X-only A selection updates X and retains B in Y. XY choices and unavailable directions stay intact outside the overlap. Immutable owner radio masks represent partially retained scope, and actual alias-slot intersections limit updates; no display-name inference or extra normalization pass is introduced. The old mixed-scope exception guard is removed in this local unpublished candidate. Selecting an all-direction common part intentionally updates every direction it supports.
+
+Fresh full CPU passes core **34/196**, runtime **45/696** and preparation **61/352**: **140 cases / 1244 assertions**, zero failures. Fresh private host-reference WARP passes **51 cases / 509 assertions, tolerance 0**. Plugin/HostProof/CLI and test builds pass with zero compiler warnings/errors. Official latest stable was checked anew before final validation: **4.56.1.0**, the same verified executable hash, SDK **10.0.401**. This remains private host-reference validation rather than NuGet 3.8.3 Actions or actual YMM4 execution.
+
+Updated and new runtime coverage checks B priority, reverse selection preserving B's Y scope, explicit reselection of an already checked partial part, all None/X/Y/XY results, pure map reuse during flips, common parts with no X counterpart, and preservation of the radio P2 alias in None during a Y-only edit. A new exact WARP case checks both orders, hidden-parent edit without recomposition, restoration on show, None/XY scope isolation and old snapshots: **21 compositions / five block reads / zero transient graph objects**. Existing full-common pixel oracles now reflect the adopted all-applicable-direction update. The earlier radio baseline P2 and one-pass None regressions remain passing; the first-Y empty initialization policy is asserted unchanged. No test/build failure occurred in this priority stage; earlier failing P2/guard evidence is retained.
+
+The adopted radio conflict decision is complete at the pure state/render seam. Save/reopen, sparse settings, durable/source-edit references, palette/native Undo/output and required new Windows Actions remain OPEN; full T08/C compatibility and H-A2 remain OPEN. Immutable snapshot restoration is verified and does not claim native Undo integration. Prior candidates remain protected, with no original application, publication or permanent configuration change.
 
 ## Host gates
+
+The subsequent [sparse appearance checkpoint](SPARSE_APPEARANCE.md) implements the approved
+changed-default and repair-candidate policies, stable PSD layer-ID references, sparse ownership,
+orientation/masks, atomic recovery and opaque unknown-data retention. Fresh CPU results are
+**34/196 + 61/894 + 63/383 = 158 cases / 1473 assertions PASS**. Synthetic PSD/PSB tests include
+reconstruction in an entirely empty cache and preserved intent on unresolved references before
+compiled pixel acquisition. Managed exact-host parameter JSON/refresh-clone tests and builds
+are separate evidence, not native project save/Undo/copy/split or GUI output. The earlier
+complete-state checkpoint results below remain historical, internal experiment evidence.
+
+The subsequent checkpoint input-validation review reproduces the same-origin/zero-scope P2
+double-radio counterexample, including hidden parents. All four evaluated physical orientations
+are now checked before candidate return, and unsupported target notation/bindings produce
+non-destructive repair results. Fresh CPU **34/196 + 55/835 + 61/352 = 150/1383 PASS**, zero
+compiler warnings/errors. See the [review record](VISIBILITY_CHECKPOINT.md) for retained failures
+and the unchanged internal-only/native evidence boundaries.
+
+The local [pure visibility checkpoint](VISIBILITY_CHECKPOINT.md) passes core **34/196**,
+runtime **53/814** and preparation **61/352**: **148 cases / 1362 assertions** in a fresh
+ordinary-sandbox CPU run, with zero failures and compiler warnings/errors. Eight new runtime
+cases prove only internal JSON/state reconstruction and conservative reference recovery.
+The earlier counterpart-membership recovery failure is preserved. The types are internal;
+product sparse serialization, native parameter clone, native Undo/Redo and actual save/reopen
+remain OPEN. No new WARP/Actions or native-host evidence is included.
 
 An additional independent A09/A14 Windows regression exercises a real exclusive lock on a synthetic original source through the initial attempt and its single automatic retry. It checks the unstable-source diagnostic, retention of the previously prepared pixels, rejection of the stale publication stamp, snapshot cleanup, and recovery through an explicit new request after lock release. This is CPU preparation/OS-sharing coverage; it does not prove native Undo, visible preview retention or the normal writer's Cancel behavior. H-A2 remains OPEN.
 
@@ -89,6 +158,104 @@ Do not close H-A2 with a custom writer, injected token, test cleanup counted as 
 
 Record product/source and checkout SHAs, official host version/hash, SDK, commands, synthetic input identity, writer/range, assertions and artifact identity. Preserve diagnostics on success/failure/timeout/cancel. Separate implementation, pure tests, native integration, physical-device measurements and human visual/audio acceptance.
 
-CI uploads named synthetic JSON/provenance only, retained three days; expired artifacts cannot independently prove results. Do not upload user material, derived cache/manifest/pixels/project/screenshots or host binaries. Authorized local material can support local visual acceptance with a redacted public summary.
+Development regression CI uploads named synthetic JSON/provenance only, retained three days; expired artifacts cannot independently prove results. Do not upload user material, derived cache/manifest/pixels/project/screenshots or host binaries. Authorized local material can support local visual acceptance with a redacted public summary.
 
 Final PASS requires [T01-T12/Q01-Q04](PRODUCT_REQUIREMENTS.md), phase exits, normal editing/player/save/output and distribution first-use. Required unsupported profiles remain failures/pending work, not narrowed requirements. Intent must survive deleting every disposable cache.
+
+## Synthetic palette Actions UI lane
+
+The authorized `palette-native-ui.yml` lane uses one freshly verified latest-stable
+official Lite host on a Windows runner. It requires the host-realized product
+`PsdPaletteView` to be loaded, visible, contained by its actual host presentation root and
+bound to the current host-created palette VM before editing. Four synthetic rows,
+their actual CheckBox/Button command bindings, independent eyes/mouth settings,
+standard host Undo/Redo, pane hide/redisplay, native SaveProject/OpenProject and
+post-reopen edits are separate machine gates.
+
+Native run [37251899727](https://github.com/ziro-lab/ymm4-psd-tachie-next/actions/runs/37251899727)
+is **PASS: 240 assertions, zero failed**, at source/checkout
+`80291417a8288e27546af364449f70b0d46a6f94`, latest-stable Lite **4.56.1.0**,
+.NET SDK **10.0.401**. The actual host supplied TimelineToolInfo and created the
+product View/VM. Public WPF PresentationSource roots expose floating tool content
+outside Application.Windows; the gate verifies its exact host ToolArea and layout.
+Pane redisplay and native project reopen resolve the new current host-created VM.
+A VM-only result cannot pass. Earlier View-discovery/layout/redisplay failures and
+one diagnostic compile failure remain separate retained failures.
+
+The six-member artifact `synthetic-palette-native-ui`, ID `11320254684`, has SHA256
+`848f0307feb5fe6fca07b2b8059f94edeabb114c2825822783fb4927d045bbf4`.
+The ZIP and every result/PNG hash were verified. Four synthetic PNGs show the
+standing target, eyes target, mouth target and reopened mouth target; all four
+were visually inspected. Transparent View pixels are rendered over the live
+logical host Window's opaque brush (or Windows WindowBrush) for a readable PNG;
+this does not change product controls or capture a desktop. Standard host
+Undo/Redo, independent contributor envelopes, native saved JSON, new live item
+identities and post-reopen edit/Undo are asserted. The pending-edit empty-hint
+check is limited to its one measured public flags/history-event condition; it is
+not a general dirty-state or arbitrary history-depth guarantee.
+WPF `RenderTargetBitmap` PNGs and bound `Command.Execute` are not OS mouse/keyboard
+input proof, D3D preview pixel equivalence or human usability acceptance.
+H-A2, physical GPU/audio and Record-throw/post-Capture guarantees remain OPEN.
+
+This separate lane uploads only an explicit allowlist: `provenance.json`,
+`palette-results.json`, and four named synthetic product-View PNGs, retained
+seven days. Generated PSD/project/cache, host or driver binaries, user settings,
+raw diagnostics and full-desktop captures are excluded. Current-source PR events
+enable review-branch execution; workflow_dispatch becomes available when the
+workflow is recognized on the default branch. No default-branch merge is needed
+or performed for PR execution.
+
+The Windows runner precedent is Lab
+[35881469265](https://github.com/ziro-lab/chat-native-work-lab-001/actions/runs/35881469265)
+at `83f15c6dcefbcd53fd2f9357c913af4486a27fb6`: its actual host View is rendered by
+`RenderTargetBitmap`, with separate no-scroll refresh/alignment assertions.
+That evidence is not a PSD palette PASS. The local first-party
+`docs/proofs/PaletteNativeProof.cs` supplies the bounded API/history/reopen
+baseline; the compiled Actions driver adds mandatory real-View and binding gates.
+
+## Local hierarchical palette increment (native execution pending)
+
+On 2026-10-05, work based on PR4 head a0a61e9 connects group folding to the
+existing sparse palette. The main synthetic RGB8 PSD has 18 physical nodes and
+14 logical rows: body/clothes/accessory, face/eyes/mouth, hair, exclusive radio
+choices, source-hidden force-visible parts and exact X counterparts. A second
+fixture exercises a flipped group with a matched child and a direction-only child.
+Same-name counterpart children retain distinct raw PSD IDs: the synthetic writer
+assigns IDs by record position rather than record-value equality.
+Main fixture SHA256: dbfcaa23354192d564b9d06827f0711c5f5845f977db8e484aec3c569e75b301.
+
+Local managed hierarchy checks are **10 cases / 77 assertions, zero failures**:
+logical preorder/parent/depth, nested folding, counterpart merging, fixed controls,
+independent sparse eyes/mouth owners, all-orientation evaluation, unrelated parts,
+hidden-parent intent, Inherit and managed parameter JSON roundtrip. A non-visible
+STA component constructs the actual row XAML and verifies fold/checkbox/Inherit
+bindings and indent; it creates no Application/Window and proves no host interaction.
+Existing parameter/exception/face/projection checks pass **25 + 65 + 20 + 10
+assertions**. Existing CPU core/runtime/preparation pass **34/196 + 65/914 +
+63/383 = 162 cases / 1493 assertions**. Product/managed/native-driver builds have
+zero warnings/errors against official latest stable Lite **4.56.1.0** and SDK
+**10.0.401**; no local YMM4 process was launched or settings changed.
+
+Retained local failures: JSON serializer name ambiguity in the new test; a test-only
+single-document pool reused for the second fixture; and two preparation child-process
+failures when the suite was started through dotnet DLL rather than its intended
+apphost. Qualified serialization, a separate fixture pool and apphost execution
+respectively resolved those failures. Product preparation code was not changed.
+The 63/383 apphost PASS is separate from the retained 61/63 DLL-start failure.
+
+The prepared Actions hierarchy mode reuses the prior public host-created View/VM,
+PresentationSource, control Command, native Undo and SaveProject/OpenProject route.
+It adds fold/expand/current-epoch/history gates, exclusive eye/mouth selection,
+X counterpart/parent-hide checks and six synthetic View PNGs. Virtualization is
+bounded: a logical tree count is separate from fully realized rows inside the actual
+list viewport. Public WPF ScrollIntoView realizes the exact command row; this is
+not OS mouse/keyboard input. **New hierarchy Actions/native PASS and visual QA
+are pending publication/run approval.** Earlier flat 240-assertion evidence remains
+valid only for its original source/run.
+
+The proposed native artifact allowlist is exactly nine files: provenance.json,
+palette-results.json, palette-hierarchy-results.json, target.png, eyes.png,
+mouth.png, reopened.png, hierarchy-expanded.png, hierarchy-folded.png.
+Keep PSD/project/cache/host/plugin binaries, settings and raw diagnostics excluded.
+Human usability, broad hierarchy/DPI/theme/width/resource coverage, D3D preview
+pixels, H-A2 and the other unfinished requirements remain OPEN.

@@ -10,11 +10,17 @@ public sealed class RenderPlan
     public ImmutableArray<int> ActiveNodeIds { get; }
     public ImmutableArray<int> RequiredBlockIds { get; }
     public long UploadBytes { get; }
+    public PsdPrefixVisibility? PrefixVisibility { get; }
+    public PsdVisibilityState? Visibility { get; }
+    public PsdFlipState FlipState => Visibility?.FlipState ?? PsdFlipState.None;
     private readonly bool[] active;
     public bool IsActive(int id) => active[id];
-    private RenderPlan(CompiledManifest manifest, IEnumerable<int>? enabled)
+    private RenderPlan(CompiledManifest manifest, IEnumerable<int>? enabled, PsdPrefixVisibility? prefixVisibility = null,
+        PsdVisibilityState? visibility = null)
     {
         Manifest = manifest;
+        PrefixVisibility = prefixVisibility;
+        Visibility = visibility;
         var lists = Enumerable.Range(0, manifest.Nodes.Length + 1).Select(_ => new List<int>()).ToArray();
         foreach (var n in manifest.Nodes) lists[(n.ParentId ?? -1) + 1].Add(n.Id);
         Children = lists.Select(l => l.OrderBy(id => manifest.Nodes[id].Order).ToImmutableArray()).ToImmutableArray();
@@ -72,4 +78,15 @@ public sealed class RenderPlan
         UploadBytes = uploadBytes;
     }
     public static RenderPlan Create(CompiledManifest manifest, IEnumerable<int>? enabled = null) => new(manifest, enabled);
+    public static RenderPlan CreatePrefixVisibility(CompiledManifest manifest, PsdPrefixVisibility visibility)
+    {
+        ArgumentNullException.ThrowIfNull(visibility);
+        visibility.ValidateGeneration(manifest);
+        return new(manifest, visibility.EnabledNodeIds, visibility);
+    }
+    public static RenderPlan CreateNotationVisibility(CompiledManifest manifest, PsdVisibilityState visibility)
+    {
+        ArgumentNullException.ThrowIfNull(visibility); visibility.ValidateGeneration(manifest);
+        return new(manifest, visibility.EnabledNodeIds, visibility: visibility);
+    }
 }

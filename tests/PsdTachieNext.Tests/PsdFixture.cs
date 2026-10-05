@@ -18,20 +18,25 @@ internal static class PsdFixture
         return b;
     }
     public static byte[] MaskPixels() => Enumerable.Range(0, Width * Height).Select(i => (byte)(i * 7)).ToArray();
-    private sealed record Layer(string Name, bool Hidden = false, int Divider = 0, bool Mask = false,
+    internal sealed record Layer(string Name, bool Hidden = false, int Divider = 0, bool Mask = false,
         byte Opacity = 255, string Blend = "norm", bool Clipping = false, byte Seed = 11, string? Unicode = null);
 
-    public static void Write(string path, bool psb = false, bool rle = false, bool groups = false, byte seed = 11)
+    public static void Write(string path, bool psb = false, bool rle = false, bool groups = false, byte seed = 11,
+        string visibleName = "visible", string hiddenName = "hidden", int[]? layerIds = null,
+        string[]? simpleLayerNames = null, bool[]? simpleLayerVisible = null, Layer[]? layers = null)
     {
         // Top-to-bottom logical order; PSD file stores reversed record order.
-        var ordered = groups
+        var ordered = layers ?? (simpleLayerNames is not null
+            ? simpleLayerNames.Select((name,i)=>new Layer(name, Hidden: !simpleLayerVisible![i], Seed: (byte)(11+i*17))).ToArray()
+            : groups
             ? new[] { new Layer("Group", Divider: 1, Opacity: 191, Blend: "pass"),
                 new Layer("eye", Mask: true, Opacity: 173, Blend: "mul ", Clipping: true, Seed: seed, Unicode: "目/％"),
                 new Layer("eye", Hidden: true, Seed: 23), new Layer("End", Divider: 3), new Layer("body", Seed: 33) }
-            : new[] { new Layer("visible", Seed: seed), new Layer("hidden", Hidden: true, Seed: 23) };
+            : new[] { new Layer(visibleName, Seed: seed), new Layer(hiddenName, Hidden: true, Seed: 23) });
         using var records = new MemoryStream(); using var data = new MemoryStream();
-        foreach (var layer in ordered.Reverse())
+        for (var layerIndex = ordered.Length - 1; layerIndex >= 0; layerIndex--)
         {
+            var layer = ordered[layerIndex];
             var folder = layer.Divider != 0;
             var channels = folder ? Array.Empty<short>() : layer.Mask ? new short[] { 0, 1, 2, -1, -2 } : [0, 1, 2, -1];
             var payloads = new List<byte[]>();
@@ -73,6 +78,10 @@ internal static class PsdFixture
                 using var tag = new MemoryStream(); U32(tag, layer.Unicode.Length); tag.Write(Encoding.BigEndianUnicode.GetBytes(layer.Unicode));
                 Tag(extra, "luni", tag.ToArray());
             }
+            if(layerIds is not null)
+            {
+                using var tag=new MemoryStream();U32(tag,layerIds[layerIndex]);Tag(extra,"lyid",tag.ToArray());
+            }
             U32(records, checked((int)extra.Length)); extra.Position = 0; extra.CopyTo(records);
             foreach (var payload in payloads) data.Write(payload);
         }
@@ -84,6 +93,26 @@ internal static class PsdFixture
         U16(output, 4); U32(output, Height); U32(output, Width); U16(output, 8); U16(output, 3);
         U32(output, 0); U32(output, 0); Length(output, maskSection.Length, psb);
         maskSection.Position = 0; maskSection.CopyTo(output); U16(output, 0); output.Write(new byte[Width * Height * 4]);
+    }
+    // Compiled preorder IDs, distinct from physical PSD IDs/end-divider records.
+    public const int Body = 0, Base = 1, Clothes = 2, Accessory = 3, Face = 4,
+        Eyes = 5, EyeOpen = 6, EyeClosed = 7, EyeOpenX = 8, EyeClosedX = 9,
+        Mouth = 10, MouthRest = 11, MouthSmile = 12, MouthRestX = 13, MouthSmileX = 14,
+        Hair = 15, HairPaint = 16, HairLine = 17;
+    public static void WritePaletteHierarchy(string path)
+    {
+        Layer Group(string name) => new(name, Divider: 1, Blend: "pass");
+        Layer End() => new("End", Divider: 3);
+        var layers = new[] {
+            Group("!body"), new Layer("!base", Hidden: true), new Layer("clothes"),
+            new Layer("accessory"), End(),
+            Group("face"), Group("eyes"), new Layer("*open"), new Layer("*closed", Hidden: true),
+            new Layer("*open:flipx", Hidden: true), new Layer("*closed:flipx", Hidden: true), End(),
+            Group("mouth"), new Layer("*rest"), new Layer("*smile", Hidden: true),
+            new Layer("*rest:flipx", Hidden: true), new Layer("*smile:flipx", Hidden: true), End(), End(),
+            Group("hair"), new Layer("paint"), new Layer("!line", Hidden: true), End()
+        };
+        Write(path, layers: layers, layerIds: Enumerable.Range(1001, layers.Length).ToArray());
     }
     private static void Tag(Stream s, string key, byte[] payload)
     { Ascii(s, "8BIM"); Ascii(s, key); U32(s, payload.Length); s.Write(payload); if ((payload.Length & 1) != 0) s.WriteByte(0); }

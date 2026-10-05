@@ -96,7 +96,7 @@ public sealed class SelectedSourcePrefetch : IDisposable
             lock(gate)if(ReferenceEquals(current,entry)){entry.Watch=watch;watch=null;}
             token.ThrowIfCancellationRequested();
             using var asset=await preparation.PrepareAsync(entry.Source,entry.Revision,token).ConfigureAwait(false);
-            candidate=await Task.Run(()=>asset.PrepareAppearanceWithinBudget(pool,maximumDecodedBytes,token:token),token).ConfigureAwait(false);
+            candidate=await Task.Run(()=>asset.PrepareNotationAppearanceWithinBudget(pool,maximumDecodedBytes,token:token),token).ConfigureAwait(false);
             if(preparation.Revision(entry.Source.Path)!=entry.Revision)
                 throw new SourceChangedDuringPreparationException("Selected source changed during prefetch.");
             lock(gate)

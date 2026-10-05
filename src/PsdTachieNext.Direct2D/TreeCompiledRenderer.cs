@@ -98,7 +98,7 @@ public sealed class TreeCompiledRenderer : IDisposable
         ValidateSupported();
         if (ready.Plan.UploadBytes > maxUploadBytes) throw new CacheCapacityException("Active uploads exceed the admitted working set.");
         plan = ready.Plan; prepared = ready; children = plan.Children;
-        var key = AppearanceKey.Create(manifest, plan.ActiveNodeIds, Profile, deviceEpoch: deviceEpoch);
+        var key = AppearanceKey.Create(manifest, plan.ActiveNodeIds, Profile, flipState: (int)plan.FlipState, deviceEpoch: deviceEpoch);
         if (output is not null && key == currentKey) { prepared = null!; return false; }
 
         using var previousTarget = context.Target;
@@ -111,7 +111,11 @@ public sealed class TreeCompiledRenderer : IDisposable
             pending = context.CreateBitmap(new SizeI(manifest.Width, manifest.Height),
                 new BitmapProperties1(ColorFormat, 96, 96, BitmapOptions.Target));
             context.Target = pending; context.Dpi = new(96,96); context.UnitMode = UnitMode.Pixels;
-            context.Transform = Matrix3x2.Identity; context.PrimitiveBlend = PrimitiveBlend.SourceOver;
+            var flipX = plan.FlipState is PsdFlipState.X or PsdFlipState.XY;
+            var flipY = plan.FlipState is PsdFlipState.Y or PsdFlipState.XY;
+            context.Transform = new(flipX ? -1 : 1, 0, 0, flipY ? -1 : 1,
+                flipX ? manifest.Width : 0, flipY ? manifest.Height : 0);
+            context.PrimitiveBlend = PrimitiveBlend.SourceOver;
             context.BeginDraw(); drawing = true; context.Clear(new Color4(0,0,0,0));
             if (image is not null) context.DrawImage(image);
             var result = context.EndDraw(); drawing = false; result.CheckError();

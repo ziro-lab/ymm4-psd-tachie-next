@@ -10,15 +10,39 @@ Each phase is a reviewable change with focused tests and a Draft PR. A later pha
 | --- | --- | --- | --- |
 | A: original input and asynchronous preparation | Snapshot/hash separate from conversion; content reuse, asset sharing, one compiler, cancellation, stale-result guards, shared-lock I/O removal, prepared leases, original-source persistence/load | Core implemented; synthetic and bounded historical native results; **H-A2 OPEN** | A01-A30 mapped to actual results; paused native refresh, cold normal output, failure/cancel/reference change, original-source save/reopen/material listing |
 | B: input/draw compatibility | Required PSD/PSB profiles and effects; preserve structure, metadata, precision/dimensions; explicit unsupported diagnostics | RGB8 compiler and flat/tree renderer implemented; full coverage OPEN | Profile/effect inventory, independent pixel oracles, nested masks/groups/blending/alpha, full-quality host comparisons; no silent flattening/omission |
-| C: notation/durable references | One notation index per generation over original names; `*`, `!`, flips, duplicate/hierarchy/escaping rules; durable references/schema and ambiguity repair | Local candidate: read-only generation notation index; behavior, durable references and repair OPEN | Pure notation/reference matrix, native exclusive-switch Undo, cache deletion/source edit/relink preserve or explicitly repair intent |
-| D: sparse expressions/presets/Override | Depends on C; base, immutable character preset, item-local patch; target priority/inheritance; empty control patches | Not implemented; face/character settings minimal | Overlapping eye/mouth/hand examples, target-only higher-timeline-layer conflicts and verified ties; local changes cannot mutate presets; native Undo/save |
+| C: notation/durable references | One notation index per generation over original names; `*`, `!`, flips, duplicate/hierarchy/escaping rules; durable references/schema and ambiguity repair | Published read-only index at `808a5fb`; local prefix/flip evaluation and synthetic WARP candidate; stable current-selection return and direction-only choice memory adopted and locally verified; explicit radio priority within applicable scopes adopted and locally verified, including reverse-order partial memory; first-Y directional initialization policy unchanged/unadopted; ambiguity repair, durable references and native UI/Undo OPEN | Pure notation/reference matrix, native exclusive-switch Undo, cache deletion/source edit/relink preserve or explicitly repair intent |
+| D: sparse expressions/presets/Override | Depends on C; base, immutable character preset, item-local patch; target priority/inheritance; empty control patches | Sparse base/item/ordered-face composition implemented; flat native eye/mouth ownership and Inherit verified in PR4; shared presets and complete Override OPEN | Overlapping eye/mouth/hand examples, target-only higher-timeline-layer conflicts and verified ties; local changes cannot mutate presets; native Undo/save |
 | E: Extend | Depends on D and proved timeline input; adopt semantics before implementation | **EX1 PROPOSED, not adopted** | Event/range truth table; forward/direct/reverse seek, adjacent split/real gap, temporary override/reset, cache deletion, save/reopen and Undo agree |
 | F: eye/mouth animation | C/D plus public host time/voice; deterministic blink seed, mouth settings, stop/default-return/speaking-only controls | Not implemented | Controlled time/voice; playback/scrub/output agree; no redraw-count RNG or extra recognition; unchanged-state GPU reuse |
-| G: detailed/simple/settings palettes | C/D/F; selected target, presets/slots/quick parts, native Undo, working-copy confirm/cancel, window preferences | Not implemented | Selection/close/disposal races, one Undo per exclusive action, DPI/foreground/scale/settings persistence, virtualized bounded shared-document thumbnails; real interaction |
+| G: detailed/simple/settings palettes | C/D/F; selected target, presets/slots/quick parts, native Undo, working-copy confirm/cancel, window preferences | Detailed palette candidate and flat native View/commands/Undo/reopen verified in PR4; logical hierarchy/folding locally verified, native hierarchy pending; simple/settings/presets/animation/window preferences OPEN | Selection/close/disposal races, one Undo per exclusive action, DPI/foreground/scale/settings persistence, virtualized bounded shared-document thumbnails; real interaction |
 | H: persistence/lifecycle hardening | Cross-cutting A-G; schema/copy/split/template, move/relink/cache deletion, save/reopen, device replacement, strict output, finite resources | Minimal persistence and scoped guards implemented; full matrix OPEN | Intent survives cache removal and item operations; malformed/unsupported data explicit; native device/cancel/output; measured repeated-use resource recovery |
 | I: distribution/final acceptance | A-H | No general-use package or release | Clean install without SDK/terminal/Git/Python/manual compile; first-use through output; permitted local real-material/long-session tests; licenses and full acceptance review |
 
 T01-T12 and Q01-Q04 remain binding. A does not waive notation, expressions, palettes, animation or draw compatibility. Initial compiler concurrency is one. Larger prefetch budgets require measured benefit and resource evidence; current selected-source decoded retention is 16 MiB/30 seconds, not the proposed 32 MiB.
+
+## Immediate detailed-palette checkpoint (2026-10-05)
+
+PR4 head a0a61e9dfb8b33fa79ac03e97242474044f5984f has the bounded flat
+native proof (240 assertions). This does not establish groups, exclusive switches,
+force-visible controls or flip counterparts in the actual palette. The current
+local increment implements logical origin hierarchy and folding without changing
+appearance envelopes/history. Synthetic nested groups with exclusive eyes/mouth,
+force-visible parts and X counterparts exercise independent partial ownership.
+A second fixture checks matched children and a direction-only child under a
+flipped group.
+
+Exit for this increment: managed hierarchy/parameter and non-visible row-template
+checks; then the existing real-host Actions route must verify actual fold bindings,
+unchanged contributor JSON/history on folding, exclusive eye/mouth edits, standard
+Undo/Redo, parent hide/restore, X counterparts and native save/reopen. Keep the
+successful flat evidence and local/native hierarchy evidence separate.
+The hierarchy driver is locally built; a new public push/run is awaiting scope
+approval. No human-input or D3D preview-pixel claim follows from these checks.
+
+After this bounded connection, continue the unimplemented basic settings/quick-part,
+preset and animation work under T05/T07/T09. Extend still requires its own adopted
+semantics. Keep H-A2 active and do not expand the provisional UI design or imply
+full phase C/D/G completion from this increment.
 
 ## Immediate A checkpoint: H-A2
 
@@ -52,5 +76,12 @@ Extend remains required; EX1 is a proposal. Decide and record:
 Before E code, expand the truth table for carry alone, temporary override/return, reset during carry, reset after override ends, adjacent split/gap, scope separation, direct/reverse seek, empty control patches and conflict priority. Record adopted rules, rejected alternatives and unverified host input. No Extend state machine is part of current A.
 
 ## Completion review
+
+The next C/H persistence step has an internal [pure checkpoint prototype](VISIBILITY_CHECKPOINT.md)
+with local reconstruction tests. It does not close durable-reference, sparse-settings or native
+save/Undo gates. Before native wiring, decide validated PSD-ID/fallback references, sparse
+base/default/alias ownership and unsupported-schema retention; then re-test parameter cloning,
+atomic native edits and preparation/reopen lifetimes. Do not persist the diagnostic full logical
+checkpoint as an item expression snapshot.
 
 Phase exits need the evidence above and updated docs. Final acceptance requires normal timeline/player, save/reopen, actual output and physical-device/resource observations wherever claimed. CI build/WARP cannot replace them. Distribution requires separate explicit approval after feature, quality, lifecycle and workflow acceptance.
