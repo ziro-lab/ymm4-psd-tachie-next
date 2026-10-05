@@ -291,18 +291,18 @@ internal static class PaletteNativeProof
                 await ViewAndCapture("hierarchy-expanded.png");
                 var beforeFoldEvents = historyEvents; var beforeFoldCommands = historyCommands;
                 var staleFoldRow = palette.Rows.Single(r => r.Origin == eyeOrigin).ToggleCommand;
-                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "fold eyes group");
+                await Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "fold eyes group");
                 Check(palette.Rows.Count == 12 && palette.Rows.Any(r => r.Origin == mouthOrigin)
                     && !palette.Rows.Any(r => r.Origin == eyeOrigin), "eye fold preserves mouth rows");
                 Check(!staleFoldRow.CanExecute(null), "hidden row from prior fold epoch is disabled");
                 staleFoldRow.Execute(null);
-                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "fold face ancestor");
+                await Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "fold face ancestor");
                 Check(palette.Rows.Count == 8 && palette.Rows.Any(r => r.Origin == PsdFixture.HairPaint),
                     "ancestor fold preserves unrelated parts");
                 await ViewAndCapture("hierarchy-folded.png");
-                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "expand face ancestor");
+                await Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "expand face ancestor");
                 Check(palette.Rows.Count == 12 && !palette.Rows.Any(r => r.Origin == eyeOrigin), "nested fold retained");
-                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "expand eyes group");
+                await Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "expand eyes group");
                 Check(palette.Rows.Count == 14 && palette.Rows.Any(r => r.Origin == eyeOrigin), "expand restores logical rows");
                 Check(historyEvents == beforeFoldEvents && historyCommands == beforeFoldCommands
                     && StandingParameter().Appearance!.Json == baselineJson
@@ -312,7 +312,7 @@ internal static class PaletteNativeProof
             }
 
             var standingRow = palette.Rows.Single(row => row.Origin == hairOrigin);
-            Execute(standingRow.ToggleCommand, "standing hair off product row command");
+            await Execute(standingRow.ToggleCommand, "standing hair off product row command");
             await Ready(Expected(hair: false), "standing hair off");
             Check(StandingParameter().Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([2, hairOrigin]), "standing sparse owner exactly clothes/hair");
             await History(CommandType.Undo); await Ready(Expected(), "standing standard Undo");
@@ -323,7 +323,7 @@ internal static class PaletteNativeProof
 
             await Select(Eye(), "eye target");
             Check(palette.Header.Contains("表情", StringComparison.Ordinal) && palette.Header.Contains("Layer 2", StringComparison.Ordinal), "eye target header");
-            Execute(palette.Rows.Single(row => row.Origin == eyeOrigin).ToggleCommand, "eye-only product row command");
+            await Execute(palette.Rows.Single(row => row.Origin == eyeOrigin).ToggleCommand, "eye-only product row command");
             await Ready(Expected(true), "eye-only native output", requireEye: true);
             var eyeJson = FaceParameter(Eye()).Appearance!.Json;
             Check(FaceParameter(Eye()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([eyeOrigin]), "eye patch owns only eyes");
@@ -339,7 +339,7 @@ internal static class PaletteNativeProof
             Check(!staleEyeCommand.CanExecute(null), "row command from previous selected target is disabled");
             staleEyeCommand.Execute(null);
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance is null, "stale command cannot write old or new target");
-            Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).ToggleCommand, "mouth-only product row command");
+            await Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).ToggleCommand, "mouth-only product row command");
             var combined = await Ready(Expected(true, true), "eye plus mouth native output", requireEye: true, requireMouth: true);
             var mouthJson = FaceParameter(Mouth()).Appearance!.Json;
             await ViewAndCapture("mouth.png");
@@ -347,7 +347,7 @@ internal static class PaletteNativeProof
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && StandingParameter().Appearance!.Json == baselineJson, "mouth edit preserves eye/base JSON exactly");
             Check(combined.Stamp.SessionId == originalSession && combined.Pointer == originalPointer, "native face edits retain same Source/output lifetime");
             Check(combined.Faces.Any(f => f.Layer == 2 && f.Json == eyeJson) && combined.Faces.Any(f => f.Layer == 5 && f.Json == mouthJson), "actual host Faces input carries both authored patches with correct layer numbers");
-            Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).InheritCommand, "mouth Inherit product row command");
+            await Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).InheritCommand, "mouth Inherit product row command");
             await Ready(Expected(true), "mouth inherited without altering eye", requireEye: true);
             Check(FaceParameter(Mouth()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).IsEmpty, "Inherit removes only mouth ownership");
             await History(CommandType.Undo); await Ready(Expected(true, true), "mouth Inherit Undo", requireEye: true, requireMouth: true);
@@ -359,14 +359,14 @@ internal static class PaletteNativeProof
             if (hierarchy)
             {
                 await Select(Standing(), "hierarchy orientation target");
-                Execute(palette.XCommand, "hierarchy X bound command");
+                await Execute(palette.XCommand, "hierarchy X bound command");
                 await Ready(Expected(true, true, flipX: true), "X counterparts / independent other parts", requireEye:true, requireMouth:true);
                 Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance!.Json == mouthJson,
                     "native orientation edit leaves eye/mouth contributors unchanged");
                 await History(CommandType.Undo);
                 await Ready(Expected(true, true), "orientation single native Undo", requireEye:true, requireMouth:true);
                 Check(StandingParameter().Appearance!.Json == baselineJson, "orientation Undo exact base");
-                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ToggleCommand, "hide face parent");
+                await Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ToggleCommand, "hide face parent");
                 await Ready([0,1,3,15,16,17], "hidden face parent preserves other parts", requireEye:true, requireMouth:true);
                 Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance!.Json == mouthJson,
                     "native hidden parent preserves child contributor intent");
@@ -435,7 +435,7 @@ internal static class PaletteNativeProof
             }
             await Select(Eye(), "reopened eye target");
             Check(palette.Rows.Single(row=>row.Origin==eyeOrigin).Owned, "reopened palette eye ownership");
-            Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.EyeOpen : eyeOrigin)).ToggleCommand, "reopened eye default product command");
+            await Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.EyeOpen : eyeOrigin)).ToggleCommand, "reopened eye default product command");
             await Ready(Expected(false, true), "reopened eye OFF output", requireEye:true, requireMouth:true);
             Check(StandingParameter().Appearance!.Json==baselineJson && FaceParameter(Mouth()).Appearance!.Json==mouthJson,
                 "reopened eye edit preserves saved standing and mouth exactly");
@@ -445,7 +445,7 @@ internal static class PaletteNativeProof
             await Select(Mouth(), "reopened mouth target");
             Check(palette.Rows.Single(row=>row.Origin==mouthOrigin).Owned && !palette.Rows.Single(row=>row.Origin==eyeOrigin).Owned,
                 "reopened palette mouth-only ownership");
-            Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.MouthRest : mouthOrigin)).ToggleCommand, "reopened mouth default product command");
+            await Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.MouthRest : mouthOrigin)).ToggleCommand, "reopened mouth default product command");
             await Ready(Expected(true), "reopened mouth OFF output", requireEye:true, requireMouth:true);
             Check(StandingParameter().Appearance!.Json==baselineJson && FaceParameter(Eye()).Appearance!.Json==eyeJson,
                 "reopened mouth edit preserves saved standing and eye exactly");
@@ -525,7 +525,7 @@ internal static class PaletteNativeProof
                 command!.Execute(null, window!); historyCommands++; await Task.Delay(100);
                 Trace("after-standard-" + type);
             }
-            void Execute(ICommand command, string label)
+            async Task Execute(ICommand command, string label)
             {
                 if (hierarchy)
                 {
@@ -534,9 +534,12 @@ internal static class PaletteNativeProof
                     if (row is not null)
                     {
                         var list = Elements(liveView!).OfType<ListBox>().Single();
-                        list.ScrollIntoView(row); liveView!.UpdateLayout();
+                        list.ScrollIntoView(row);
+                        await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                        liveView!.UpdateLayout();
                     }
                 }
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var control = Elements(liveView!).OfType<ButtonBase>()
                     .SingleOrDefault(button => ReferenceEquals(button.Command, command));
                 Check(control is not null && control.IsLoaded && control.IsVisible && control.IsEnabled,
@@ -546,6 +549,7 @@ internal static class PaletteNativeProof
                 Trace("before-product-command:" + label);
                 control.Command.Execute(control.CommandParameter);
                 Trace("after-product-command:" + label); Log(label + " bound command executed");
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             }
             async Task<PsdPaletteView> ViewAndCapture(string? png)
             {
