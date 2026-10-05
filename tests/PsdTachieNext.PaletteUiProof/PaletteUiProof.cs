@@ -321,6 +321,14 @@ internal static class PaletteNativeProof
             await Until(() => !shownView.IsVisible, "public pane hide did not hide actual View");
             Check(!shownView.IsVisible, "actual product pane hidden through public host container");
             Check(OpenTool(main!, new PsdPalettePlugin().Name), "public product pane redisplayed");
+            var redisplayedProduct = Public(Tool(main!, new PsdPalettePlugin().Name), "ViewModel") as PsdPaletteViewModel;
+            Check(redisplayedProduct is not null, "host current product VM exists after pane redisplay");
+            if (!ReferenceEquals(redisplayedProduct, palette)) {
+                palette.PropertyChanged -= paletteObserver;
+                palette = redisplayedProduct;
+                palette!.PropertyChanged += paletteObserver;
+            }
+            await Select(Mouth(), "redisplayed mouth target");
             liveView = await ViewAndCapture(null);
             Check(ReferenceEquals(liveView.DataContext, palette), "redisplayed View uses current product VM");
             ProjectCommand(main!, "SaveProject", savePath);
@@ -505,6 +513,15 @@ internal static class PaletteNativeProof
                 }
                 var bitmap = new RenderTargetBitmap((int)Math.Ceiling(current.ActualWidth),
                     (int)Math.Ceiling(current.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+                // A View has a transparent default background. Use the live logical host
+                // Window's opaque background, or the current Windows WindowBrush, for a
+                // readable synthetic PNG without changing any actual product control.
+                var background = hostWindow!.Background is SolidColorBrush { Color: { A: 255 } } opaque
+                    ? opaque : SystemColors.WindowBrush;
+                var backdrop = new DrawingVisual();
+                using (var drawing = backdrop.RenderOpen())
+                    drawing.DrawRectangle(background, null, new Rect(0, 0, current.ActualWidth, current.ActualHeight));
+                bitmap.Render(backdrop);
                 bitmap.Render(current);
                 if (png is not null) {
                     var encoder = new PngBitmapEncoder();
@@ -515,6 +532,7 @@ internal static class PaletteNativeProof
                 viewProof.Add(new { image = png, current.IsLoaded, current.IsVisible,
                     current.ActualWidth, current.ActualHeight, currentVm = true, hostWindow = true,
                     presentationRoot = presentationRoot!.GetType().FullName, actualHostToolArea = true,
+                    pngBackground = background.Color.ToString(), backgroundSource = "live logical host Window opaque brush or Windows WindowBrush",
                     selectedLayers = info!.Timeline.SelectedItems.Select(item => item.Layer).ToArray(),
                     visibleRows = rowControls.Length,
                     rowLabels = rowControls.Select(row => row.Content?.ToString()).ToArray(),
