@@ -34,6 +34,7 @@ public sealed class PsdPaletteViewModel : ITimelineToolViewModel, INotifyPropert
     private IDisposable? watch;
     private PsdLayerReferenceIndex? index;
     private Context? ready;
+    private readonly HashSet<int> collapsed = [];
     private SourceAssetRef? loadedSource;
     private long loadedRevision = -1, epoch;
     private bool active = true, disposed, committing;
@@ -126,6 +127,7 @@ public sealed class PsdPaletteViewModel : ITimelineToolViewModel, INotifyPropert
         epoch++; CanEdit = false; ready = null; Rows.Clear();
         loading?.Cancel(); loading?.Dispose(); loading = null;
         if (!release) return;
+        collapsed.Clear();
         document?.Dispose(); document = null; asset?.Dispose(); asset = null; index = null;
         watch?.Dispose(); watch = null; loadedSource = null; loadedRevision = -1;
     }
@@ -227,27 +229,43 @@ public sealed class PsdPaletteViewModel : ITimelineToolViewModel, INotifyPropert
         { Status = "設定を保持して編集を停止しています: " + (ownResult.Reason ?? effective.Reason); return; }
         ready = context;
         var owned = own.OwnedOrigins(context.Source.AssetIdentity, refs);
-        var selection = refs.Notation.FlipBindings.Selection;
         var visibleOrigins = SelectedOrigins(effective.State!);
         var ticket = epoch;
-        foreach (var node in refs.Notation.Nodes.Where(node => selection.OriginNodeIds[node.NodeId] == node.NodeId))
+        foreach (var entry in PsdPaletteTree.Project(refs.Notation, collapsed))
         {
-            var depth = 0; var parent = node.ParentId;
-            while (parent is int id) { depth++; parent = refs.Notation.Nodes[id].ParentId; }
+            var node = entry.Node;
             var visible = visibleOrigins.Contains(node.NodeId);
-            Rows.Add(new PsdPaletteRow(node.NodeId, new string(' ', depth * 2) + node.DisplayName, visible,
+            Rows.Add(new PsdPaletteRow(node.NodeId, node.DisplayName, visible,
                 owned.Contains(node.NodeId), node.SelectionMarker,
                 new PaletteCommand(() => Edit(ticket, (settings, target, idx) => settings.SetVisible(target.Source.AssetIdentity,
                     idx, node.NodeId, node.SelectionMarker == PsdSelectionMarker.Radio || !visible)),
                     () => CanEdit && ticket == epoch && node.SelectionMarker != PsdSelectionMarker.ForceVisible),
                 new PaletteCommand(() => Edit(ticket, (settings, target, idx) => settings.Inherit(target.Source.AssetIdentity, idx, node.NodeId)),
-                    () => CanEdit && ticket == epoch && owned.Contains(node.NodeId))));
+                    () => CanEdit && ticket == epoch && owned.Contains(node.NodeId)),
+                entry.Depth, entry.ParentOrigin, node.Kind == NodeKind.Group, !collapsed.Contains(node.NodeId),
+                new PaletteCommand(() => Fold(ticket, node.NodeId),
+                    () => CanEdit && ticket == epoch && node.Kind == NodeKind.Group)));
         }
         Orientation = "向き: " + (own.AuthoredFlip(context.Source.AssetIdentity)?.ToString() ?? "継承"); Notify(nameof(Orientation));
         Status = context.Item is TachieFaceItem
             ? "準備完了。選択表情と立ち絵の継承を表示。ほかの表情との最終合成はYMM4プレビューで確認してください"
             : "準備完了。選択立ち絵の設定を表示。表情との最終合成はYMM4プレビューで確認してください";
         CanEdit = true;
+    }
+    private void Fold(long ticket, int origin)
+    {
+        dispatcher.VerifyAccess();
+        if (!CanEdit || ticket != epoch || ready is not { } context || index is null) return;
+        try
+        {
+            if (!context.Same(Capture()) || loadedRevision != preparation.Revision(context.Source.Path))
+            { Refresh(); return; }
+            if (!collapsed.Add(origin)) collapsed.Remove(origin);
+            ClearReady(release: false);
+            Show(context);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NotSupportedException)
+        { Refresh(); Status = "対象を再確認してください: " + ex.Message; }
     }
     public bool SetVisible(int origin, bool visible)
         => Edit(epoch, (settings, context, refs) => settings.SetVisible(context.Source.AssetIdentity, refs, origin, visible));
@@ -320,8 +338,13 @@ public sealed class PsdPaletteViewModel : ITimelineToolViewModel, INotifyPropert
 }
 
 public sealed record PsdPaletteRow(int Origin, string Label, bool Visible, bool Owned, PsdSelectionMarker Marker,
-    ICommand ToggleCommand, ICommand InheritCommand)
+    ICommand ToggleCommand, ICommand InheritCommand,
+    int Depth, int? ParentOrigin, bool IsGroup, bool Expanded, ICommand ExpandCommand)
 {
+    public Thickness Indent => new(Depth * 14, 0, 0, 0);
+    public Visibility ExpanderVisibility => IsGroup ? Visibility.Visible : Visibility.Hidden;
+    public string ExpandLabel => Expanded ? "▾" : "▸";
+    public string ExpandHelp => Expanded ? "グループを折り畳む" : "グループを展開する";
     public bool ToggleEnabled => Marker != PsdSelectionMarker.ForceVisible;
     public string Ownership => Marker == PsdSelectionMarker.ForceVisible ? "固定" : Owned ? "この対象で指定" : "継承";
 }

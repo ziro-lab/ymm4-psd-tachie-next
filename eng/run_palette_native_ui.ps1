@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$Ymm4Dir,
     [Parameter(Mandatory=$true)][string]$DriverDir,
-    [Parameter(Mandatory=$true)][string]$EvidenceDir
+    [Parameter(Mandatory=$true)][string]$EvidenceDir,
+    [ValidateSet("flat","hierarchy")][string]$Scenario="flat"
 )
 $ErrorActionPreference='Stop'
 if($env:GITHUB_ACTIONS -ne 'true' -or -not $env:RUNNER_TEMP -or -not $env:GITHUB_RUN_ID){
@@ -25,6 +26,9 @@ New-Item -ItemType Directory -Force $EvidenceDir | Out-Null
 $scratch=Join-Path $env:RUNNER_TEMP 'psd-palette-synthetic-input-and-private-diagnostics'
 New-Item -ItemType Directory -Path $scratch | Out-Null
 $env:PSD_NEXT_PALETTE_NATIVE_OUTPUT=$scratch
+$env:PSD_NEXT_PALETTE_SCENARIO=$Scenario
+$images=@('target.png','eyes.png','mouth.png','reopened.png')
+if($Scenario -eq 'hierarchy'){$images+=@('hierarchy-expanded.png','hierarchy-folded.png')}
 $process=$null
 try{
     $process=Start-Process -FilePath $exe -WorkingDirectory $hostRoot -WindowStyle Hidden -PassThru
@@ -40,17 +44,19 @@ try{
     }
     $data=Get-Content -Raw -LiteralPath $result | ConvertFrom-Json
     Copy-Item -LiteralPath $result -Destination (Join-Path $EvidenceDir 'palette-results.json')
-    foreach($name in @('target.png','eyes.png','mouth.png','reopened.png')){
+    foreach($name in $images){
         $image=Join-Path $scratch $name
         if(Test-Path -LiteralPath $image){Copy-Item -LiteralPath $image -Destination (Join-Path $EvidenceDir $name)}
     }
     Write-Host ("palette_status="+$data.status+";assertions="+$data.assertions+";realized_view="+$data.actualHostRealizedProductView+";physical_input=false")
+    if($data.scenario -ne $Scenario){throw 'Native fixture scenario mismatch.'}
     if($data.status -ne 'PASS'){throw 'Native palette validation failed or blocked; inspect allowlisted JSON.'}
-    foreach($name in @('target.png','eyes.png','mouth.png','reopened.png')){
+    foreach($name in $images){
         if(-not(Test-Path -LiteralPath (Join-Path $EvidenceDir $name))){throw 'Expected synthetic WPF evidence missing.'}
     }
 }finally{
     Remove-Item Env:PSD_NEXT_PALETTE_NATIVE_OUTPUT -ErrorAction SilentlyContinue
+    Remove-Item Env:PSD_NEXT_PALETTE_SCENARIO -ErrorAction SilentlyContinue
     if($process -and -not $process.HasExited){
         # Runner-only owned test process cleanup, not product history rollback.
         Stop-Process -Id $process.Id -Force

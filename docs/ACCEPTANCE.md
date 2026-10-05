@@ -212,3 +212,50 @@ at `83f15c6dcefbcd53fd2f9357c913af4486a27fb6`: its actual host View is rendered 
 That evidence is not a PSD palette PASS. The local first-party
 `docs/proofs/PaletteNativeProof.cs` supplies the bounded API/history/reopen
 baseline; the compiled Actions driver adds mandatory real-View and binding gates.
+
+## Local hierarchical palette increment (native execution pending)
+
+On 2026-10-05, work based on PR4 head a0a61e9 connects group folding to the
+existing sparse palette. The main synthetic RGB8 PSD has 18 physical nodes and
+14 logical rows: body/clothes/accessory, face/eyes/mouth, hair, exclusive radio
+choices, source-hidden force-visible parts and exact X counterparts. A second
+fixture exercises a flipped group with a matched child and a direction-only child.
+Same-name counterpart children retain distinct raw PSD IDs: the synthetic writer
+assigns IDs by record position rather than record-value equality.
+Main fixture SHA256: dbfcaa23354192d564b9d06827f0711c5f5845f977db8e484aec3c569e75b301.
+
+Local managed hierarchy checks are **10 cases / 77 assertions, zero failures**:
+logical preorder/parent/depth, nested folding, counterpart merging, fixed controls,
+independent sparse eyes/mouth owners, all-orientation evaluation, unrelated parts,
+hidden-parent intent, Inherit and managed parameter JSON roundtrip. A non-visible
+STA component constructs the actual row XAML and verifies fold/checkbox/Inherit
+bindings and indent; it creates no Application/Window and proves no host interaction.
+Existing parameter/exception/face/projection checks pass **25 + 65 + 20 + 10
+assertions**. Existing CPU core/runtime/preparation pass **34/196 + 65/914 +
+63/383 = 162 cases / 1493 assertions**. Product/managed/native-driver builds have
+zero warnings/errors against official latest stable Lite **4.56.1.0** and SDK
+**10.0.401**; no local YMM4 process was launched or settings changed.
+
+Retained local failures: JSON serializer name ambiguity in the new test; a test-only
+single-document pool reused for the second fixture; and two preparation child-process
+failures when the suite was started through dotnet DLL rather than its intended
+apphost. Qualified serialization, a separate fixture pool and apphost execution
+respectively resolved those failures. Product preparation code was not changed.
+The 63/383 apphost PASS is separate from the retained 61/63 DLL-start failure.
+
+The prepared Actions hierarchy mode reuses the prior public host-created View/VM,
+PresentationSource, control Command, native Undo and SaveProject/OpenProject route.
+It adds fold/expand/current-epoch/history gates, exclusive eye/mouth selection,
+X counterpart/parent-hide checks and six synthetic View PNGs. Virtualization is
+bounded: a logical tree count is separate from fully realized rows inside the actual
+list viewport. Public WPF ScrollIntoView realizes the exact command row; this is
+not OS mouse/keyboard input. **New hierarchy Actions/native PASS and visual QA
+are pending publication/run approval.** Earlier flat 240-assertion evidence remains
+valid only for its original source/run.
+
+The proposed native artifact allowlist is exactly nine files: provenance.json,
+palette-results.json, palette-hierarchy-results.json, target.png, eyes.png,
+mouth.png, reopened.png, hierarchy-expanded.png, hierarchy-folded.png.
+Keep PSD/project/cache/host/plugin binaries, settings and raw diagnostics excluded.
+Human usability, broad hierarchy/DPI/theme/width/resource coverage, D3D preview
+pixels, H-A2 and the other unfinished requirements remain OPEN.

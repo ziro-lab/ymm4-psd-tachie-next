@@ -7,6 +7,9 @@ on:
       - '.github/workflows/palette-native-ui.yml'
       - 'eng/run_palette_native_ui.ps1'
       - 'tests/PsdTachieNext.PaletteUiProof/**'
+      - 'src/PsdTachieNext.Ymm4/PsdPalette*.cs'
+      - 'tests/PsdTachieNext.ParameterTests/**'
+      - 'tests/PsdTachieNext.Tests/PsdFixture.cs'
 
 permissions:
   contents: read
@@ -67,10 +70,17 @@ jobs:
         run: |
           dotnet build tests/PsdTachieNext.PaletteUiProof -c Release "-p:YMM4DirPath=$env:YMM4_DIR" -o out/palette-driver --nologo
           if ($LASTEXITCODE -ne 0) { throw 'Palette driver build failed.' }
-      - name: Validate host-realized palette, bound commands, native history and reopen
+      - name: Run managed hierarchy and parameter regressions against the same host
         shell: pwsh
         run: |
-          ./eng/run_palette_native_ui.ps1 -Ymm4Dir $env:YMM4_DIR -DriverDir (Join-Path $PWD 'out/palette-driver') -EvidenceDir (Join-Path $PWD 'out/palette-evidence')
+          dotnet build tests/PsdTachieNext.ParameterTests -c Release "-p:YMM4DirPath=$env:YMM4_DIR" -o out/palette-managed --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Managed palette regression build failed.' }
+          dotnet out/palette-managed/PsdTachieNext.ParameterTests.dll $env:YMM4_DIR (Join-Path $PWD 'out/palette-evidence/parameter-results.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Managed palette regressions failed.' }
+      - name: Validate hierarchical palette, folding, independent parts, native history and reopen
+        shell: pwsh
+        run: |
+          ./eng/run_palette_native_ui.ps1 -Ymm4Dir $env:YMM4_DIR -DriverDir (Join-Path $PWD 'out/palette-driver') -EvidenceDir (Join-Path $PWD 'out/palette-evidence') -Scenario hierarchy
       - name: Record allowlisted provenance
         if: always()
         shell: pwsh
@@ -78,7 +88,7 @@ jobs:
           New-Item -ItemType Directory -Force out/palette-evidence | Out-Null
           $root=Join-Path $PWD 'out/palette-evidence'
           $hashes=[ordered]@{}
-          foreach($name in @('palette-results.json','target.png','eyes.png','mouth.png','reopened.png')){
+          foreach($name in @('palette-results.json','palette-hierarchy-results.json','target.png','eyes.png','mouth.png','reopened.png','hierarchy-expanded.png','hierarchy-folded.png')){
             $path=Join-Path $root $name
             if(Test-Path -LiteralPath $path){$hashes[$name]=(Get-FileHash $path).Hash.ToLowerInvariant()}
           }
@@ -96,9 +106,12 @@ jobs:
           path: |
             out/palette-evidence/provenance.json
             out/palette-evidence/palette-results.json
+            out/palette-evidence/palette-hierarchy-results.json
             out/palette-evidence/target.png
             out/palette-evidence/eyes.png
             out/palette-evidence/mouth.png
             out/palette-evidence/reopened.png
+            out/palette-evidence/hierarchy-expanded.png
+            out/palette-evidence/hierarchy-folded.png
           retention-days: 7
           if-no-files-found: warn

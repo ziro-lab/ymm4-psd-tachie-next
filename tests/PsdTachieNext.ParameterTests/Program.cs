@@ -22,6 +22,7 @@ try
     AppearanceEditCases.Run(Path.Combine(Path.GetDirectoryName(args[1])!, "appearance-edit-failure-results.json"));
     FaceParameterCases.Run(Path.Combine(Path.GetDirectoryName(args[1])!, "face-parameter-results.json"));
     PaletteProjectionCases.Run(Path.Combine(Path.GetDirectoryName(args[1])!, "palette-projection-results.json"));
+    PaletteHierarchyCases.Run(Path.Combine(Path.GetDirectoryName(args[1])!, "palette-hierarchy-results.json"));
     return 0;
 }
 catch (Exception error) { Console.Error.WriteLine(error); return 1; }

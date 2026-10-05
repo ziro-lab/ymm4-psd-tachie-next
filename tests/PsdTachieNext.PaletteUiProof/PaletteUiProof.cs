@@ -124,7 +124,18 @@ internal static class PaletteNativeProof
         var marker = "PaletteNative-" + Guid.NewGuid().ToString("N");
         var publicState = new List<object>();
         DispatcherTimer? stateTimer=null;
-        var path = Path.Combine(output, "synthetic-eyes-mouth.psd");
+        var hierarchy = Environment.GetEnvironmentVariable("PSD_NEXT_PALETTE_SCENARIO") == "hierarchy";
+        var eyeOrigin = hierarchy ? PsdFixture.EyeClosed : 0;
+        var mouthOrigin = hierarchy ? PsdFixture.MouthSmile : 1;
+        var hairOrigin = hierarchy ? PsdFixture.Hair : 3;
+        var logicalRows = hierarchy ? 14 : 4;
+        int[] Expected(bool eyes = false, bool mouth = false, bool hair = true, bool flipX = false)
+            => hierarchy
+                ? new[] { 0,1,3,4,5, eyes ? (flipX ? 9 : 7) : (flipX ? 8 : 6),10,
+                    mouth ? (flipX ? 14 : 12) : (flipX ? 13 : 11) }
+                    .Concat(hair ? new[] { 15,16,17 } : []).Order().ToArray()
+                : new[] { eyes ? 0 : -1, mouth ? 1 : -1, hair ? 3 : -1 }.Where(id => id >= 0).ToArray();
+        var path = Path.Combine(output, hierarchy ? "synthetic-hierarchy.psd" : "synthetic-eyes-mouth.psd");
         var seedPath = Path.Combine(output, "seed.ymmp"); var savePath = Path.Combine(output, "palette-saved.ymmp");
         var ids = new[] { 11, 12, 13, 14 }; var names = new[] { "eyes", "mouth", "clothes", "hair" };
         SourceAssetRef? reference = null;
@@ -219,7 +230,8 @@ internal static class PaletteNativeProof
             await Until(() => !Application.Current.Windows.Cast<Window>().Any(w => w.DataContext?.GetType().FullName == "YukkuriMovieMaker.ViewModels.AboutViewModel")
                 && Tool(main!, "PSD palette native checkpoint") is not null && Tool(main!, "PSD立ち絵パレット") is not null,
                 "Startup/modal/product tool registration blocked", 45);
-            PsdFixture.Write(path, layerIds: ids, simpleLayerNames: names, simpleLayerVisible: [false, false, true, true]);
+            if (hierarchy) PsdFixture.WritePaletteHierarchy(path);
+            else PsdFixture.Write(path, layerIds: ids, simpleLayerNames: names, simpleLayerVisible: [false, false, true, true]);
             var sourceHash = Hash(path);
             reference = SourceAssetRef.Create(path);
             using var asset = await preparation.PrepareAsync(reference, preparation.Revision(path));
@@ -265,54 +277,104 @@ internal static class PaletteNativeProof
             activeGate = "first-host-realized-product-view";
             liveView = await ViewAndCapture("target.png");
             viewGatePassed = true;
-            var original = await Ready([3], "native base");
+            var original = await Ready(Expected(), "native base");
             var originalSession = original.Stamp.SessionId; var originalPointer = original.Pointer;
             var baselineJson = StandingParameter().Appearance!.Json;
             Trace("baseline-native-open-no-post-load-initialization-setters");
-            var standingRow = palette.Rows.Single(row => row.Origin == 3);
+            if (hierarchy)
+            {
+                Check(palette.Rows.Count == 14 && palette.Rows.Single(r => r.Origin == eyeOrigin).Depth == 2,
+                    "logical nested palette hierarchy / counterparts merged");
+                Check(!palette.Rows.Single(r => r.Origin == PsdFixture.Base).ToggleEnabled
+                    && !palette.Rows.Single(r => r.Origin == PsdFixture.Base).ToggleCommand.CanExecute(null),
+                    "source-hidden force-visible part is fixed in actual palette");
+                await ViewAndCapture("hierarchy-expanded.png");
+                var beforeFoldEvents = historyEvents; var beforeFoldCommands = historyCommands;
+                var staleFoldRow = palette.Rows.Single(r => r.Origin == eyeOrigin).ToggleCommand;
+                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "fold eyes group");
+                Check(palette.Rows.Count == 12 && palette.Rows.Any(r => r.Origin == mouthOrigin)
+                    && !palette.Rows.Any(r => r.Origin == eyeOrigin), "eye fold preserves mouth rows");
+                Check(!staleFoldRow.CanExecute(null), "hidden row from prior fold epoch is disabled");
+                staleFoldRow.Execute(null);
+                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "fold face ancestor");
+                Check(palette.Rows.Count == 8 && palette.Rows.Any(r => r.Origin == PsdFixture.HairPaint),
+                    "ancestor fold preserves unrelated parts");
+                await ViewAndCapture("hierarchy-folded.png");
+                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ExpandCommand, "expand face ancestor");
+                Check(palette.Rows.Count == 12 && !palette.Rows.Any(r => r.Origin == eyeOrigin), "nested fold retained");
+                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Eyes).ExpandCommand, "expand eyes group");
+                Check(palette.Rows.Count == 14 && palette.Rows.Any(r => r.Origin == eyeOrigin), "expand restores logical rows");
+                Check(historyEvents == beforeFoldEvents && historyCommands == beforeFoldCommands
+                    && StandingParameter().Appearance!.Json == baselineJson
+                    && FaceParameter(Eye()).Appearance is null && FaceParameter(Mouth()).Appearance is null,
+                    "fold changes no contributor JSON or native history");
+                await Ready(Expected(), "fold preserves actual Source active hierarchy");
+            }
+
+            var standingRow = palette.Rows.Single(row => row.Origin == hairOrigin);
             Execute(standingRow.ToggleCommand, "standing hair off product row command");
-            await Ready([], "standing hair off");
-            Check(StandingParameter().Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([2, 3]), "standing sparse owner exactly clothes/hair");
-            await History(CommandType.Undo); await Ready([3], "standing standard Undo");
+            await Ready(Expected(hair: false), "standing hair off");
+            Check(StandingParameter().Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([2, hairOrigin]), "standing sparse owner exactly clothes/hair");
+            await History(CommandType.Undo); await Ready(Expected(), "standing standard Undo");
             Check(StandingParameter().Appearance!.Json == baselineJson, "standing Undo exact original envelope");
-            await History(CommandType.Redo); await Ready([], "standing standard Redo");
-            await History(CommandType.Undo); await Ready([3], "standing restored for partial faces");
+            await History(CommandType.Redo); await Ready(Expected(hair: false), "standing standard Redo");
+            await History(CommandType.Undo); await Ready(Expected(), "standing restored for partial faces");
             Check(StandingParameter().Appearance!.Json == baselineJson, "base exact before partial expressions");
 
             await Select(Eye(), "eye target");
             Check(palette.Header.Contains("表情", StringComparison.Ordinal) && palette.Header.Contains("Layer 2", StringComparison.Ordinal), "eye target header");
-            Execute(palette.Rows.Single(row => row.Origin == 0).ToggleCommand, "eye-only product row command");
-            await Ready([0, 3], "eye-only native output", requireEye: true);
+            Execute(palette.Rows.Single(row => row.Origin == eyeOrigin).ToggleCommand, "eye-only product row command");
+            await Ready(Expected(true), "eye-only native output", requireEye: true);
             var eyeJson = FaceParameter(Eye()).Appearance!.Json;
-            Check(FaceParameter(Eye()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([0]), "eye patch owns only eyes");
+            Check(FaceParameter(Eye()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([eyeOrigin]), "eye patch owns only eyes");
             Check(StandingParameter().Appearance!.Json == baselineJson && FaceParameter(Mouth()).Appearance is null, "eye edit cannot author base or mouth");
-            await History(CommandType.Undo); await Ready([3], "eye standard Undo");
+            await History(CommandType.Undo); await Ready(Expected(), "eye standard Undo");
             Check(FaceParameter(Eye()).Appearance is null, "eye single Undo returns old null parameter default");
-            await History(CommandType.Redo); await Ready([0, 3], "eye standard Redo", requireEye: true);
+            await History(CommandType.Redo); await Ready(Expected(true), "eye standard Redo", requireEye: true);
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson, "eye Redo exact envelope");
 
             await ViewAndCapture("eyes.png");
-            var staleEyeCommand = palette.Rows.Single(row => row.Origin == 0).ToggleCommand;
+            var staleEyeCommand = palette.Rows.Single(row => row.Origin == eyeOrigin).ToggleCommand;
             await Select(Mouth(), "mouth target");
             Check(!staleEyeCommand.CanExecute(null), "row command from previous selected target is disabled");
             staleEyeCommand.Execute(null);
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance is null, "stale command cannot write old or new target");
-            Execute(palette.Rows.Single(row => row.Origin == 1).ToggleCommand, "mouth-only product row command");
-            var combined = await Ready([0, 1, 3], "eye plus mouth native output", requireEye: true, requireMouth: true);
+            Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).ToggleCommand, "mouth-only product row command");
+            var combined = await Ready(Expected(true, true), "eye plus mouth native output", requireEye: true, requireMouth: true);
             var mouthJson = FaceParameter(Mouth()).Appearance!.Json;
             await ViewAndCapture("mouth.png");
-            Check(FaceParameter(Mouth()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([1]), "mouth patch owns only mouth");
+            Check(FaceParameter(Mouth()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).SetEquals([mouthOrigin]), "mouth patch owns only mouth");
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && StandingParameter().Appearance!.Json == baselineJson, "mouth edit preserves eye/base JSON exactly");
             Check(combined.Stamp.SessionId == originalSession && combined.Pointer == originalPointer, "native face edits retain same Source/output lifetime");
             Check(combined.Faces.Any(f => f.Layer == 2 && f.Json == eyeJson) && combined.Faces.Any(f => f.Layer == 5 && f.Json == mouthJson), "actual host Faces input carries both authored patches with correct layer numbers");
-            Execute(palette.Rows.Single(row => row.Origin == 1).InheritCommand, "mouth Inherit product row command");
-            await Ready([0, 3], "mouth inherited without altering eye", requireEye: true);
+            Execute(palette.Rows.Single(row => row.Origin == mouthOrigin).InheritCommand, "mouth Inherit product row command");
+            await Ready(Expected(true), "mouth inherited without altering eye", requireEye: true);
             Check(FaceParameter(Mouth()).Appearance!.OwnedOrigins(reference.AssetIdentity, index).IsEmpty, "Inherit removes only mouth ownership");
-            await History(CommandType.Undo); await Ready([0, 1, 3], "mouth Inherit Undo", requireEye: true, requireMouth: true);
+            await History(CommandType.Undo); await Ready(Expected(true, true), "mouth Inherit Undo", requireEye: true, requireMouth: true);
             Check(FaceParameter(Mouth()).Appearance!.Json == mouthJson, "Inherit Undo exact mouth patch");
-            await History(CommandType.Redo); await Ready([0, 3], "mouth Inherit Redo", requireEye: true);
-            await History(CommandType.Undo); await Ready([0, 1, 3], "save combined partial expressions", requireEye: true, requireMouth: true);
+            await History(CommandType.Redo); await Ready(Expected(true), "mouth Inherit Redo", requireEye: true);
+            await History(CommandType.Undo); await Ready(Expected(true, true), "save combined partial expressions", requireEye: true, requireMouth: true);
             Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && StandingParameter().Appearance!.Json == baselineJson, "Inherit/history does not rewrite unrelated contributors");
+
+            if (hierarchy)
+            {
+                await Select(Standing(), "hierarchy orientation target");
+                Execute(palette.XCommand, "hierarchy X bound command");
+                await Ready(Expected(true, true, flipX: true), "X counterparts / independent other parts", requireEye:true, requireMouth:true);
+                Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance!.Json == mouthJson,
+                    "native orientation edit leaves eye/mouth contributors unchanged");
+                await History(CommandType.Undo);
+                await Ready(Expected(true, true), "orientation single native Undo", requireEye:true, requireMouth:true);
+                Check(StandingParameter().Appearance!.Json == baselineJson, "orientation Undo exact base");
+                Execute(palette.Rows.Single(r => r.Origin == PsdFixture.Face).ToggleCommand, "hide face parent");
+                await Ready([0,1,3,15,16,17], "hidden face parent preserves other parts", requireEye:true, requireMouth:true);
+                Check(FaceParameter(Eye()).Appearance!.Json == eyeJson && FaceParameter(Mouth()).Appearance!.Json == mouthJson,
+                    "native hidden parent preserves child contributor intent");
+                await History(CommandType.Undo);
+                await Ready(Expected(true, true), "hidden parent single native Undo", requireEye:true, requireMouth:true);
+                Check(StandingParameter().Appearance!.Json == baselineJson, "hidden parent Undo exact base");
+                await Select(Mouth(), "mouth before pane lifecycle");
+            }
 
             var shownView = liveView!;
             var container = Tool(main!, new PsdPalettePlugin().Name)!;
@@ -347,7 +409,7 @@ internal static class PaletteNativeProof
             await Until(() => Fixtures().Length == 3 && !ReferenceEquals(Standing(), oldStanding)
                 && !info!.AsyncAwaitStatus.IsBusy, "Native reopen did not complete new live project scope");
             Check(!ReferenceEquals(Eye(), oldEye) && !ReferenceEquals(Mouth(), oldMouth), "native reopen new face item identities");
-            var reopened = await Ready([0, 1, 3], "reopened partial face composition", requireEye:true, requireMouth:true);
+            var reopened = await Ready(Expected(true, true), "reopened partial face composition", requireEye:true, requireMouth:true);
             Check(reopened.Stamp.SessionId != originalSession, "native reopen new Source lifetime");
             Check(StandingParameter().Appearance!.Json == baselineJson && FaceParameter(Eye()).Appearance!.Json == eyeJson
                 && FaceParameter(Mouth()).Appearance!.Json == mouthJson, "native reopen exact three independent envelopes");
@@ -372,22 +434,22 @@ internal static class PaletteNativeProof
                 undoable.UndoRedoCommandCreated+=handler;commandSubscriptions.Add((undoable,handler));
             }
             await Select(Eye(), "reopened eye target");
-            Check(palette.Rows.Single(row=>row.Origin==0).Owned, "reopened palette eye ownership");
-            Execute(palette.Rows.Single(row=>row.Origin==0).ToggleCommand, "reopened eye OFF product command");
-            await Ready([1,3], "reopened eye OFF output", requireEye:true, requireMouth:true);
+            Check(palette.Rows.Single(row=>row.Origin==eyeOrigin).Owned, "reopened palette eye ownership");
+            Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.EyeOpen : eyeOrigin)).ToggleCommand, "reopened eye default product command");
+            await Ready(Expected(false, true), "reopened eye OFF output", requireEye:true, requireMouth:true);
             Check(StandingParameter().Appearance!.Json==baselineJson && FaceParameter(Mouth()).Appearance!.Json==mouthJson,
                 "reopened eye edit preserves saved standing and mouth exactly");
-            await History(CommandType.Undo); await Ready([0,1,3], "reopened eye single Undo", requireEye:true, requireMouth:true);
+            await History(CommandType.Undo); await Ready(Expected(true, true), "reopened eye single Undo", requireEye:true, requireMouth:true);
             Check(FaceParameter(Eye()).Appearance!.Json==eyeJson && FaceParameter(Mouth()).Appearance!.Json==mouthJson
                 && StandingParameter().Appearance!.Json==baselineJson, "reopened eye Undo restores exact three saved envelopes");
             await Select(Mouth(), "reopened mouth target");
-            Check(palette.Rows.Single(row=>row.Origin==1).Owned && !palette.Rows.Single(row=>row.Origin==0).Owned,
+            Check(palette.Rows.Single(row=>row.Origin==mouthOrigin).Owned && !palette.Rows.Single(row=>row.Origin==eyeOrigin).Owned,
                 "reopened palette mouth-only ownership");
-            Execute(palette.Rows.Single(row=>row.Origin==1).ToggleCommand, "reopened mouth OFF product command");
-            await Ready([0,3], "reopened mouth OFF output", requireEye:true, requireMouth:true);
+            Execute(palette.Rows.Single(row=>row.Origin==(hierarchy ? PsdFixture.MouthRest : mouthOrigin)).ToggleCommand, "reopened mouth default product command");
+            await Ready(Expected(true), "reopened mouth OFF output", requireEye:true, requireMouth:true);
             Check(StandingParameter().Appearance!.Json==baselineJson && FaceParameter(Eye()).Appearance!.Json==eyeJson,
                 "reopened mouth edit preserves saved standing and eye exactly");
-            await History(CommandType.Undo); await Ready([0,1,3], "reopened mouth single Undo", requireEye:true, requireMouth:true);
+            await History(CommandType.Undo); await Ready(Expected(true, true), "reopened mouth single Undo", requireEye:true, requireMouth:true);
             Check(FaceParameter(Eye()).Appearance!.Json==eyeJson && FaceParameter(Mouth()).Appearance!.Json==mouthJson
                 && StandingParameter().Appearance!.Json==baselineJson, "reopened mouth Undo restores exact three saved envelopes");
             await ViewAndCapture("reopened.png");
@@ -418,7 +480,7 @@ internal static class PaletteNativeProof
                 "empty hint retains unrecorded unrelated user edit and authored settings");
             info.UndoRedoManager.Record(); // Record the user's single edit once; never clear/rollback/retry.
             await History(CommandType.Undo);
-            await Ready([0,1,3],"pending unrelated edit single Undo",requireEye:true,requireMouth:true);
+            await Ready(Expected(true, true),"pending unrelated edit single Undo",requireEye:true,requireMouth:true);
             Check(Standing().Remark==originalRemark && FaceParameter(Eye()).Appearance!.Json==eyeJson
                 && FaceParameter(Mouth()).Appearance!.Json==mouthJson && StandingParameter().Appearance!.Json==baselineJson,
                 "pending user edit survives hint and records as exact one-Undo unit");
@@ -432,7 +494,7 @@ internal static class PaletteNativeProof
             async Task Select(IItem target, string label)
             {
                 info!.Timeline.SelectItem(target);
-                await Until(() => palette.CanEdit && palette.Rows.Count == 4 && info.Timeline.SelectedItems.Count == 1
+                await Until(() => palette.CanEdit && palette.Rows.Count == logicalRows && info.Timeline.SelectedItems.Count == 1
                     && ReferenceEquals(info.Timeline.SelectedItems[0], target), label + " did not prepare actual selected target; state=" + palette.ProofLifetime + "; status=" + palette.Status);
                 await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 if (viewGatePassed) liveView = await ViewAndCapture(null);
@@ -450,7 +512,7 @@ internal static class PaletteNativeProof
                         && (!requireMouth || s.Faces.Any(f => ReferenceEquals(f.Parameter, Mouth().TachieFaceParameter))));
                     return ready is not null;
                 }, label + " did not reach actual current paused Source");
-                Check(ready!.Active.Contains(3) == expected.Contains(3) && !ready.Active.Contains(2), label + " unrelated hair/clothes preserved");
+                Check(ready!.Active.Contains(hairOrigin) == expected.Contains(hairOrigin) && !ready.Active.Contains(2), label + " unrelated hair/clothes preserved");
                 snapshots.Add(new { label, ready.Stamp, ready.Generation, ready.Active, ready.Pointer,
                     itemJson = ready.Parameter.Appearance?.Json, faces = ready.Faces.Select(f => new { f.Layer, f.Revision, f.Json }),
                     historyEvents, historyCommands });
@@ -465,6 +527,16 @@ internal static class PaletteNativeProof
             }
             void Execute(ICommand command, string label)
             {
+                if (hierarchy)
+                {
+                    var row = palette.Rows.SingleOrDefault(r => ReferenceEquals(r.ToggleCommand, command)
+                        || ReferenceEquals(r.InheritCommand, command) || ReferenceEquals(r.ExpandCommand, command));
+                    if (row is not null)
+                    {
+                        var list = Elements(liveView!).OfType<ListBox>().Single();
+                        list.ScrollIntoView(row); liveView!.UpdateLayout();
+                    }
+                }
                 var control = Elements(liveView!).OfType<ButtonBase>()
                     .SingleOrDefault(button => ReferenceEquals(button.Command, command));
                 Check(control is not null && control.IsLoaded && control.IsVisible && control.IsEnabled,
@@ -502,8 +574,20 @@ internal static class PaletteNativeProof
                     && top.X + current.ActualWidth <= presentationRoot!.ActualWidth + 1
                     && top.Y + current.ActualHeight <= presentationRoot.ActualHeight + 1,
                     "product View bounds contained by actual host presentation root");
+                var list = Elements(current).OfType<ListBox>().Single();
+                var viewport = Elements(list).OfType<ScrollContentPresenter>().Single();
+                Check(viewport.IsLoaded && viewport.IsVisible && viewport.ActualHeight > 0,
+                    "actual virtualized list viewport available");
                 var rowControls = Elements(current).OfType<CheckBox>().Where(row => row.IsLoaded && row.IsVisible).ToArray();
-                Check(rowControls.Length == 4, "all four synthetic rows realized in host View");
+                if (hierarchy)
+                    rowControls = rowControls.Where(row => {
+                        var point = row.TranslatePoint(new Point(), viewport);
+                        return point.X >= -1 && point.Y >= -1
+                            && point.X + row.ActualWidth <= viewport.ActualWidth + 1
+                            && point.Y + row.ActualHeight <= viewport.ActualHeight + 1;
+                    }).ToArray();
+                Check(hierarchy ? rowControls.Length > 0 && rowControls.Length <= palette.Rows.Count : rowControls.Length == 4,
+                    hierarchy ? "bounded fully visible hierarchy rows realized in host View" : "all four synthetic rows realized in host View");
                 foreach (var row in rowControls) {
                     var p = row.TranslatePoint(new Point(), current);
                     Check(p.X >= -1 && p.Y >= -1 && p.X + row.ActualWidth <= current.ActualWidth + 1
@@ -534,6 +618,7 @@ internal static class PaletteNativeProof
                     presentationRoot = presentationRoot!.GetType().FullName, actualHostToolArea = true,
                     pngBackground = background.Color.ToString(), backgroundSource = "live logical host Window opaque brush or Windows WindowBrush",
                     selectedLayers = info!.Timeline.SelectedItems.Select(item => item.Layer).ToArray(),
+                    logicalRows = palette.Rows.Count, viewportHeight = viewport.ActualHeight,
                     visibleRows = rowControls.Length,
                     rowLabels = rowControls.Select(row => row.Content?.ToString()).ToArray(),
                     rowChecks = rowControls.Select(row => row.IsChecked).ToArray() });
@@ -554,6 +639,8 @@ internal static class PaletteNativeProof
             CompiledTachieSource.ProofHostUpdate = null; CompiledTachieSource.ProofHostError = null; CompiledTachieSource.ProofPreparation = null;
             Write("palette-results.json", new {
                 schema = "psd-next.palette-native-ui.v1",
+                scenario = hierarchy ? "hierarchy" : "flat",
+                syntheticPhysicalNodes = hierarchy ? 18 : 4, syntheticLogicalRows = logicalRows,
                 status = status.StartsWith("PASS_", StringComparison.Ordinal) && viewGatePassed ? "PASS" : "FAIL_OR_BLOCKED",
                 assertions, checks, viewProof, failureGate = error is null ? null : activeGate,
                 windowTypes = Application.Current.Windows.Cast<Window>().Select(w => new { type = w.GetType().FullName, vm = w.DataContext?.GetType().FullName, w.IsLoaded, w.IsVisible }).ToArray(),

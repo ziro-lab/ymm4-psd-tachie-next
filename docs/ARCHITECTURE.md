@@ -1,5 +1,17 @@
 # Current architecture and decisions
 
+Current status note (2026-10-05): PR4 adds sparse base/item/ordered-face composition
+and bounded flat native palette/Undo/save evidence. Historical OPEN statements below
+do not override that scoped evidence. The local hierarchy increment projects one row
+per raw-ID logical origin; counterpart groups/children share the logical parent.
+A virtualized flat list displays that tree with structural indent and group disclosure.
+Folded origins remain only in the palette VM for the current loaded generation;
+target refresh/edit retains them while source release/suspend clears them. Folding
+rebuilds row epochs, rejects stale commands and changes no parameter, native history
+or saved JSON. It adds no document parser, thumbnail/cache or custom Undo stack.
+Simple/settings palettes, presets, animation and full native hierarchy evidence
+remain unfinished.
+
 The current local [sparse persistence checkpoint](SPARSE_APPEARANCE.md) adds immutable authored
 appearance JSON to the existing item owner, validated PSD layer-ID references and worker-side
 preparation resolution. It supersedes earlier statements below that no persisted appearance

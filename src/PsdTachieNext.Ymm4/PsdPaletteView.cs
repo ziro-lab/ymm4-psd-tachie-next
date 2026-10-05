@@ -40,12 +40,14 @@ public sealed class PsdPaletteView : UserControl
         AutomationProperties.SetName(rows, "PSDの部分設定。チェックでこの対象の表示を指定し、継承に戻すで指定を解除します");
         rows.ItemTemplate = (DataTemplate)XamlReader.Parse("""
             <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-              <Grid Margin="0,2">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <CheckBox Content="{Binding Label}" IsChecked="{Binding Visible,Mode=OneWay}" Command="{Binding ToggleCommand}"
+              <Grid Margin="{Binding Indent}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Button Content="{Binding ExpandLabel}" Command="{Binding ExpandCommand}" Visibility="{Binding ExpanderVisibility}"
+                  ToolTip="{Binding ExpandHelp}" AutomationProperties.Name="{Binding ExpandHelp}" Padding="0" Margin="0,2,3,2"/>
+                <CheckBox Grid.Column="1" Content="{Binding Label}" IsChecked="{Binding Visible,Mode=OneWay}" Command="{Binding ToggleCommand}"
                   IsEnabled="{Binding ToggleEnabled}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Ownership}" VerticalAlignment="Center" Margin="8,0" />
-                <Button Grid.Column="2" Content="継承に戻す" Command="{Binding InheritCommand}" Padding="4,1" />
+                <TextBlock Grid.Column="2" Text="{Binding Ownership}" VerticalAlignment="Center" Margin="8,0" />
+                <Button Grid.Column="3" Content="継承に戻す" Command="{Binding InheritCommand}" Padding="4,1" />
               </Grid>
             </DataTemplate>
             """);
