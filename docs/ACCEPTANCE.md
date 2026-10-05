@@ -166,13 +166,17 @@ Final PASS requires [T01-T12/Q01-Q04](PRODUCT_REQUIREMENTS.md), phase exits, nor
 
 The authorized `palette-native-ui.yml` lane uses one freshly verified latest-stable
 official Lite host on a Windows runner. It requires the host-realized product
-`PsdPaletteView` to be loaded, visible, contained by its actual host Window and
+`PsdPaletteView` to be loaded, visible, contained by its actual host presentation root and
 bound to the current host-created palette VM before editing. Four synthetic rows,
 their actual CheckBox/Button command bindings, independent eyes/mouth settings,
 standard host Undo/Redo, pane hide/redisplay, native SaveProject/OpenProject and
 post-reopen edits are separate machine gates.
 
-The first execution is pending. A VM-only result must not pass the View gate.
+The first two runs were blocked before View realization. The third run found the
+real product View through public WPF PresentationSource roots, but correctly failed
+the probe's incorrect main-Window containment assumption for a floating tool.
+The corrected test uses the actual presentation root carrying the exact host
+ToolArea; full functional execution is pending. A VM-only result cannot pass.
 WPF `RenderTargetBitmap` PNGs and bound `Command.Execute` are not OS mouse/keyboard
 input proof, D3D preview pixel equivalence or human usability acceptance.
 H-A2, physical GPU/audio and Record-throw/post-Capture guarantees remain OPEN.

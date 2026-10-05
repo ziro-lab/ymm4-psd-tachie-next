@@ -426,6 +426,8 @@ internal static class PaletteNativeProof
                 info!.Timeline.SelectItem(target);
                 await Until(() => palette.CanEdit && palette.Rows.Count == 4 && info.Timeline.SelectedItems.Count == 1
                     && ReferenceEquals(info.Timeline.SelectedItems[0], target), label + " did not prepare actual selected target; state=" + palette.ProofLifetime + "; status=" + palette.Status);
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                if (viewGatePassed) liveView = await ViewAndCapture(null);
                 Check(palette.CanEdit, label + " ready");
                 Log(label + " ready " + palette.Header.Replace('\n', ' '));
             }
@@ -481,11 +483,17 @@ internal static class PaletteNativeProof
                     "product View belongs to actual visible host Window");
                 Check(ReferenceEquals(current.DataContext, Public(Tool(main!, new PsdPalettePlugin().Name), "ViewModel")),
                     "product View DataContext is current host ToolArea VM");
-                var top = current.TranslatePoint(new Point(), hostWindow!);
+                var presentationRoot = PresentationSource.FromVisual(current)?.RootVisual as FrameworkElement;
+                Check(presentationRoot is not null && presentationRoot.IsLoaded && presentationRoot.IsVisible,
+                    "product View belongs to live public WPF presentation root");
+                Check(Elements(presentationRoot!).OfType<FrameworkElement>().Any(element =>
+                    ReferenceEquals(element.DataContext, Tool(main!, new PsdPalettePlugin().Name))),
+                    "actual presentation root carries the exact host product ToolArea");
+                var top = current.TranslatePoint(new Point(), presentationRoot!);
                 Check(double.IsFinite(top.X) && double.IsFinite(top.Y) && top.X >= -1 && top.Y >= -1
-                    && top.X + current.ActualWidth <= hostWindow!.ActualWidth + 1
-                    && top.Y + current.ActualHeight <= hostWindow.ActualHeight + 1,
-                    "product View bounds contained by host Window");
+                    && top.X + current.ActualWidth <= presentationRoot!.ActualWidth + 1
+                    && top.Y + current.ActualHeight <= presentationRoot.ActualHeight + 1,
+                    "product View bounds contained by actual host presentation root");
                 var rowControls = Elements(current).OfType<CheckBox>().Where(row => row.IsLoaded && row.IsVisible).ToArray();
                 Check(rowControls.Length == 4, "all four synthetic rows realized in host View");
                 foreach (var row in rowControls) {
@@ -506,6 +514,7 @@ internal static class PaletteNativeProof
                 }
                 viewProof.Add(new { image = png, current.IsLoaded, current.IsVisible,
                     current.ActualWidth, current.ActualHeight, currentVm = true, hostWindow = true,
+                    presentationRoot = presentationRoot.GetType().FullName, actualHostToolArea = true,
                     selectedLayers = info!.Timeline.SelectedItems.Select(item => item.Layer).ToArray(),
                     visibleRows = rowControls.Length,
                     rowLabels = rowControls.Select(row => row.Content?.ToString()).ToArray(),
