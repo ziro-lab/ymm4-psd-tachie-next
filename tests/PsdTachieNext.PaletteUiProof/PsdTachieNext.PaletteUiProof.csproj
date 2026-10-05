@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Separate diagnostic output retains the already-approved product friend identity. -->
+    <AssemblyName>PsdTachieNext.HostProof</AssemblyName>
+  </PropertyGroup>
+  <Import Project="../../eng/HostReferences.props" />
+  <ItemGroup>
+    <Reference Include="$(YMM4DirPath)/YukkuriMovieMaker.dll"><Private>false</Private></Reference>
+    <Compile Include="../PsdTachieNext.Tests/PsdFixture.cs" Link="PsdFixture.cs" />
+    <ProjectReference Include="../../src/PsdTachieNext.Ymm4/PsdTachieNext.Ymm4.csproj" />
+  </ItemGroup>
+</Project>

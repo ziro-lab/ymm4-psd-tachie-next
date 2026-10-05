@@ -161,3 +161,34 @@ Record product/source and checkout SHAs, official host version/hash, SDK, comman
 CI uploads named synthetic JSON/provenance only, retained three days; expired artifacts cannot independently prove results. Do not upload user material, derived cache/manifest/pixels/project/screenshots or host binaries. Authorized local material can support local visual acceptance with a redacted public summary.
 
 Final PASS requires [T01-T12/Q01-Q04](PRODUCT_REQUIREMENTS.md), phase exits, normal editing/player/save/output and distribution first-use. Required unsupported profiles remain failures/pending work, not narrowed requirements. Intent must survive deleting every disposable cache.
+
+## Synthetic palette Actions UI lane
+
+The authorized `palette-native-ui.yml` lane uses one freshly verified latest-stable
+official Lite host on a Windows runner. It requires the host-realized product
+`PsdPaletteView` to be loaded, visible, contained by its actual host Window and
+bound to the current host-created palette VM before editing. Four synthetic rows,
+their actual CheckBox/Button command bindings, independent eyes/mouth settings,
+standard host Undo/Redo, pane hide/redisplay, native SaveProject/OpenProject and
+post-reopen edits are separate machine gates.
+
+The first execution is pending. A VM-only result must not pass the View gate.
+WPF `RenderTargetBitmap` PNGs and bound `Command.Execute` are not OS mouse/keyboard
+input proof, D3D preview pixel equivalence or human usability acceptance.
+H-A2, physical GPU/audio and Record-throw/post-Capture guarantees remain OPEN.
+
+This separate lane uploads only an explicit allowlist: `provenance.json`,
+`palette-results.json`, and four named synthetic product-View PNGs, retained
+seven days. Generated PSD/project/cache, host or driver binaries, user settings,
+raw diagnostics and full-desktop captures are excluded. Current-source PR events
+enable review-branch execution; workflow_dispatch becomes available when the
+workflow is recognized on the default branch. No default-branch merge is needed
+or performed for PR execution.
+
+The Windows runner precedent is Lab
+[35881469265](https://github.com/ziro-lab/chat-native-work-lab-001/actions/runs/35881469265)
+at `83f15c6dcefbcd53fd2f9357c913af4486a27fb6`: its actual host View is rendered by
+`RenderTargetBitmap`, with separate no-scroll refresh/alignment assertions.
+That evidence is not a PSD palette PASS. The local first-party
+`docs/proofs/PaletteNativeProof.cs` supplies the bounded API/history/reopen
+baseline; the compiled Actions driver adds mandatory real-View and binding gates.
