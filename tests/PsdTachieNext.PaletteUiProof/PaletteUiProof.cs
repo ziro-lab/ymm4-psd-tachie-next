@@ -514,7 +514,7 @@ internal static class PaletteNativeProof
                 }
                 viewProof.Add(new { image = png, current.IsLoaded, current.IsVisible,
                     current.ActualWidth, current.ActualHeight, currentVm = true, hostWindow = true,
-                    presentationRoot = presentationRoot.GetType().FullName, actualHostToolArea = true,
+                    presentationRoot = presentationRoot!.GetType().FullName, actualHostToolArea = true,
                     selectedLayers = info!.Timeline.SelectedItems.Select(item => item.Layer).ToArray(),
                     visibleRows = rowControls.Length,
                     rowLabels = rowControls.Select(row => row.Content?.ToString()).ToArray(),
